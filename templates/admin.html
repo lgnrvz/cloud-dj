@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin &middot; Cloud DJ</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: #07070d;
+            color: #c8c8d0;
+            min-height: 100vh;
+        }
+        .navbar {
+            background: #0d0d16;
+            border-bottom: 1px solid #1a1a2e;
+            padding: 14px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .brand { font-weight: 800; font-size: 1.1rem; letter-spacing: -0.5px; color: #fff; }
+        .brand span { color: #1db954; }
+        .navbar a { color: #888; text-decoration: none; margin-left: 18px; font-size: 0.8rem; }
+        .navbar a:hover { color: #fff; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        .now-playing-bar {
+            background: linear-gradient(135deg, #0d0d16, #111122);
+            border: 1px solid #ffd70033;
+            border-radius: 10px;
+            padding: 14px 18px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .now-playing-bar .dot { width: 8px; height: 8px; background: #ffd700; border-radius: 50%; animation: pulse 1.5s infinite; flex-shrink: 0; }
+        @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(1.4); } }
+        .now-playing-bar .lbl { color: #ffd700; font-weight: 600; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; }
+        .now-playing-bar .trk { color: #fff; font-weight: 700; font-size: 0.9rem; }
+        .now-playing-bar .sub { color: #666; font-size: 0.75rem; }
+
+        .admin-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-top: 16px; align-items: start; }
+        @media (max-width: 600px) { .admin-grid { grid-template-columns: 1fr; } }
+
+        .card {
+            background: #0d0d16;
+            border: 1px solid #1a1a2e;
+            border-radius: 10px;
+            padding: 16px;
+        }
+        .card h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: #666; margin-bottom: 12px; font-weight: 600; }
+
+        .queue-item {
+            padding: 10px 12px;
+            border-bottom: 1px solid #111122;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: .15s;
+        }
+        .queue-item:hover { background: #111122; }
+        .drag-handle { cursor: grab; color: #333; user-select: none; font-size: 1rem; }
+        .queue-item .info { flex: 1; min-width: 0; }
+        .queue-item .title { font-weight: 600; font-size: 0.85rem; color: #e0e0e8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .queue-item .sub { font-size: 0.7rem; color: #555; margin-top: 2px; }
+        .queue-item .sub span { margin-right: 10px; }
+        .badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 0.6rem; font-weight: 600; text-transform: uppercase; }
+        .badge-priority { background: #ffd70022; color: #ffd700; border: 1px solid #ffd70044; }
+
+        .btn {
+            font-family: 'Inter', sans-serif;
+            padding: 5px 10px;
+            border-radius: 5px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.7rem;
+            font-weight: 600;
+            transition: .15s;
+        }
+        .btn-danger { background: #ff333322; color: #ff4444; }
+        .btn-danger:hover { background: #ff333344; }
+        .btn-save { background: #333; color: #aaa; margin-top: 8px; }
+        .btn-save:hover { background: #444; color: #fff; }
+        .view-btn { background: #333; color: #888; border: 1px solid #2a2a3a; display: inline-block; text-align: center; text-decoration: none; }
+        .view-btn:hover { background: #444; color: #1db954; border-color: #1db95444; }
+
+        .love-btn { background: none; border: none; cursor: pointer; font-size: 1rem; padding: 2px 6px; transition: .2s; width: auto; margin: 0; color: #555; font-family: inherit; line-height: 1; }
+        .love-btn:hover { color: #ff4466; transform: scale(1.2); }
+        .love-btn.loved { color: #ff4466; }
+
+        .user-item { padding: 8px 10px; background: #0d0d16; border: 1px solid #1a1a2e; border-radius: 6px; margin-bottom: 6px; font-size: 0.8rem; }
+        .user-item .name { color: #e0e0e8; font-weight: 600; }
+        .user-item .badge-admin { color: #ffd700; font-size: 0.6rem; margin-left: 4px; text-transform: uppercase; }
+        .user-item .joined { color: #555; font-size: 0.7rem; margin-top: 2px; }
+        .srv-info { font-size: 0.8rem; color: #555; line-height: 1.8; }
+        .srv-info strong { color: #888; }
+        .empty { text-align: center; padding: 32px; color: #444; font-size: 0.85rem; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="brand">Cloud<span>DJ</span> <span style="color:#ffd700;font-weight:400;">Admin</span></div>
+        <div>
+            <span style="color:#555;font-size:0.8rem;">{{ current_user.name }}</span>
+            <a href="/queue">Queue</a>
+            <a href="/logout">Sign out</a>
+        </div>
+    </nav>
+    <div class="container">
+        <div class="now-playing-bar">
+            <span class="dot"></span>
+            <div style="flex:1;">
+                <div class="lbl">Now Playing</div>
+                <div class="trk" id="npTrack">{{ now.title }}</div>
+                <div class="sub" id="npMeta">{{ now.username }}</div>
+            </div>
+        </div>
+
+        <div class="admin-grid">
+            <div>
+                <div class="card">
+                    <h2>Current Queue</h2>
+                    <p style="color:#444;font-size:0.7rem;margin-bottom:8px;">Drag to reorder &middot; X to remove</p>
+                    {% if items|length == 0 %}
+                        <div class="empty">Queue is empty</div>
+                    {% else %}
+                        <div id="queue-list">
+                        {% for item in items %}
+                            <div class="queue-item" data-id="{{ item.id }}" draggable="true">
+                                <span class="drag-handle">&#x283F;</span>
+                                <div class="info">
+                                    <div class="title">{{ item.title or 'Loading...' }}</div>
+                                    <div class="sub">
+                                        <span>{{ item.username }}</span>
+                                        <span style="color:#444;">{{ item.ip_address }}</span>
+                                        <span>{{ item.created_at }}</span>
+                                        <span style="color:#555;">{{ item.status }}</span>
+                                        {% if item.priority > 0 %}<span class="badge badge-priority">Priority</span>{% endif %}
+                                    </div>
+                                </div>
+                                <div style="display:flex;gap:3px;">
+                                    <a href="{{ item.clean_url or item.youtube_url }}" target="_blank" class="btn view-btn" style="font-size:0.65rem;padding:4px 8px;text-decoration:none;">View</a>
+                                    <button class="btn btn-danger" onclick="removeItem({{ item.id }})">&#x2715;</button>
+                                </div>
+                            </div>
+                        {% endfor %}
+                        </div>
+                        <button class="btn btn-save" onclick="saveOrder()">Save Order</button>
+                    {% endif %}
+                </div>
+
+                <div class="card" style="margin-top:16px;">
+                    <h2>History</h2>
+                    {% if history|length == 0 %}
+                        <div class="empty">No played songs yet</div>
+                    {% else %}
+                        {% for item in history %}
+                        <div class="queue-item" style="cursor:default;">
+                            <div class="info">
+                                <div class="title" style="color:#888;">{{ item.title or 'Unknown' }}</div>
+                                <div class="sub">
+                                    <span>{{ item.username }}</span>
+                                    <span>{{ item.created_at }}</span>
+                                </div>
+                            </div>
+                            <div style="display:flex;gap:3px;">
+                                <a href="{{ item.clean_url or item.youtube_url }}" target="_blank" class="btn view-btn" style="font-size:0.65rem;padding:4px 8px;text-decoration:none;">View</a>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+
+            <div>
+                <div class="card">
+                    <h2>Users</h2>
+                    {% for u in users %}
+                    <div class="user-item">
+                        <span class="name">{{ u.name }}</span>
+                        {% if u.is_admin %}<span class="badge-admin">Admin</span>{% endif %}
+                        <div class="joined">@{{ u.username }} &middot; {{ u.created_at[:10] }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div class="card" style="margin-top:16px;">
+                    <h2>Server</h2>
+                    <div class="srv-info">
+                        <strong>Admin:</strong> admin / djadmin123<br>
+                        <strong>URL:</strong> http://{{ request.host }}<br>
+                        <strong>Queue:</strong> {{ items|length }} pending<br>
+                        <strong>History:</strong> {{ history|length }} played<br>
+                        <strong>Users:</strong> {{ users|length }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    let dragId = null;
+    document.querySelectorAll('.queue-item[draggable]').forEach(el => {
+        el.addEventListener('dragstart', e => { dragId = el.dataset.id; });
+        el.addEventListener('dragover', e => e.preventDefault());
+        el.addEventListener('drop', e => {
+            e.preventDefault();
+            if (dragId && dragId !== el.dataset.id) {
+                const src = document.querySelector(`[data-id="${dragId}"]`);
+                el.parentNode.insertBefore(src, el.nextSibling);
+            }
+        });
+    });
+    function removeItem(id) {
+        if (!confirm('Remove this from queue?')) return;
+        fetch('/admin/remove/' + id, { method: 'POST' }).then(() => location.reload());
+    }
+    function saveOrder() {
+        const order = [...document.querySelectorAll('.queue-item')].map(el => parseInt(el.dataset.id));
+        fetch('/admin/reorder', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({order})
+        }).then(() => location.reload());
+    }
+
+    // Live now-playing updates
+    const npTrack = document.getElementById('npTrack');
+    const npMeta = document.getElementById('npMeta');
+    setInterval(function(){
+        fetch('/now-playing').then(r=>r.json()).then(d => {
+            npTrack.textContent = d.title;
+            npMeta.textContent = d.username;
+        }).catch(() => {});
+    }, 5000);
+    </script>
+</body>
+</html>

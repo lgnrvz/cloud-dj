@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Sign up &middot; Cloud DJ{% endblock %}
+{% block content %}
+<div class="auth-card card">
+    <h1>Sign Up</h1>
+    <p>Create your account to join the music queue</p>
+    <form method="POST">
+        <input type="text" name="name" placeholder="Your Name" required>
+        <input type="text" name="username" placeholder="Username" required>
+        <input type="password" name="password" placeholder="Password" required>
+        <button type="submit">Create Account</button>
+    </form>
+    <div class="auth-link">Already have an account? <a href="{{ url_for('login') }}">Log in</a></div>
+</div>
+{% endblock %}
