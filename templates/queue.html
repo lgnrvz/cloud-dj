@@ -557,31 +557,8 @@
             .catch(() => { showToast('Failed', 'error'); btn.disabled = false; btn.textContent = '+ Queue'; });
     }
 
-    // ─── Paste to Add ───
-    // Catches paste anywhere on the page (desktop) or in the input (mobile)
-    document.addEventListener('paste', function(e) {
-        const text = (e.clipboardData || window.clipboardData).getData('text');
-        if (!text) return;
-        const ytMatch = text.match(/(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/);
-        if (!ytMatch) return;
-        // Don't prevent default — let the paste go through naturally.
-        // The input field's own paste handler will also pick it up.
-        showToast('Adding song...', 'warn');
-        const formData = new FormData();
-        formData.append('url', text.trim());
-        fetch('/add', { method: 'POST', body: formData })
-            .then(r => {
-                if (r.redirected) {
-                    showToast('Song added!');
-                    refreshQueueList();
-                } else {
-                    showToast('Failed', 'error');
-                }
-            })
-            .catch(() => showToast('Failed', 'error'));
-    });
-
-    /** Submit from the quick-add input box */
+    // ─── Submit from quick-add input ───
+    // Works on all browsers: paste auto-submits, Add button submits, Enter submits
     function submitPaste() {
         const input = document.getElementById('pasteInput');
         const text = input.value.trim();
