@@ -344,14 +344,13 @@
         // Set ID immediately to prevent poll race (next interval fires at 4s)
         currentPlayingId = np.id;
 
-        // Clear current source
-        video.pause();
-        video.removeAttribute('src');
-        video.load();
-
         if (!np.url || !np.video_id) {
             videoContainer.style.display = 'none';
             videoLoading.classList.remove('show');
+            // Clear video only for non-playable (not for track switching)
+            video.pause();
+            video.removeAttribute('src');
+            video.load();
             setStatus('#444', 'Nothing to play');
             return;
         }
@@ -367,22 +366,37 @@
             videoLoading.classList.remove('show');
 
             if (d.video_url) {
+                // Set src and start loading — keeps autoplay context since
+                // we don't pause/clear first
                 video.src = d.video_url;
                 video.load();
+
+                // Wait for enough data to actually play
                 try {
+                    await new Promise((resolve, reject) => {
+                        video.oncanplay = resolve;
+                        video.onerror = reject;
+                        // Fallback: resolve after 8s even if canplay hasn't fired
+                        setTimeout(resolve, 8000);
+                    });
                     await video.play();
-                    currentPlayingId = np.id;
                     setStatus('#1db954', 'Playing');
                 } catch (e) {
                     setStatus('#ffd700', 'Click play');
                 }
             } else {
                 videoContainer.style.display = 'none';
+                video.pause();
+                video.removeAttribute('src');
+                video.load();
                 setStatus('#ffd700', 'Stream unavailable');
             }
         } catch (e) {
             videoLoading.classList.remove('show');
             videoContainer.style.display = 'none';
+            video.pause();
+            video.removeAttribute('src');
+            video.load();
             setStatus('#444', 'Error loading');
         }
 
@@ -429,15 +443,31 @@
         loadingNext = false;
     });
 
+    /** Advance on error too (unavailable video, network failure) */
+    video.addEventListener('error', async function() {
+        // Only advance if this was a real track (not initial empty state)
+        if (currentPlayingId !== null && currentPlayingId !== undefined) {
+            currentPlayingId = null;
+            loadingNext = true;
+            setStatus('#ffd700', 'Skipping unavailable...');
+            try {
+                const resp = await fetch('/advance', { method: 'POST' });
+                const np = await resp.json();
+                updateNowUi(np.title, np.username);
+                await loadTrack(np);
+            } catch (e) {
+                setStatus('#444', 'Error advancing');
+            }
+            loadingNext = false;
+        }
+    });
+
     async function skipTrack() {
         if (skipInProgress) return;
         skipInProgress = true;
         skipBtn.disabled = true;
         skipBtn.textContent = '...';
         try {
-            video.pause();
-            video.removeAttribute('src');
-            video.load();
             const resp = await fetch('/skip');
             const np = await resp.json();
             updateNowUi(np.title, np.username);

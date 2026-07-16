@@ -422,7 +422,7 @@ def direct_video():
     try:
         result = subprocess.run(
             [YTDLP, '--js-runtimes', f'node:{NODE_PATH}',
-             '-g', '-f', 'best[height<=720]', url],
+             '-g', '-f', '18', url],
             capture_output=True, text=True, timeout=15
         )
         video_url = result.stdout.strip().split('\n')[0]
