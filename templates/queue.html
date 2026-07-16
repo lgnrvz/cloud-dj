@@ -467,7 +467,7 @@
             .then(d => {
                 if (d.loved) { btn.classList.add('loved'); btn.innerHTML = '&#9829;'; }
                 else { btn.classList.remove('loved'); btn.innerHTML = '&#9825;'; }
-                setTimeout(() => location.reload(), 500);
+                showToast(d.loved ? 'Loved!' : 'Unloved');
             });
     }
 
@@ -483,7 +483,8 @@
                 if (d && d.success) {
                     showToast('Added: ' + d.title);
                     btn.textContent = '\u2713';
-                    setTimeout(() => location.reload(), 800);
+                    btn.disabled = true;
+                    // Update queue count via polling
                 }
             })
             .catch(() => { showToast('Failed', 'error'); btn.disabled = false; btn.textContent = '+ Queue'; });
@@ -501,21 +502,45 @@
         const formData = new FormData();
         formData.append('url', text.trim());
         fetch('/add', { method: 'POST', body: formData })
-            .then(r => { if (r.redirected) { showToast('Song added!'); setTimeout(() => location.reload(), 800); }
-                else { showToast('Failed', 'error'); } })
+            .then(r => {
+                if (r.redirected) {
+                    showToast('Song added!');
+                    // Don't reload — polling will update queue display
+                } else {
+                    showToast('Failed', 'error');
+                }
+            })
             .catch(() => showToast('Failed', 'error'));
     });
 
-    // ─── Auto-refresh until titles load ───
-
-    {% if not current_user.is_admin %}
-    setInterval(function(){
-        const titles = document.querySelectorAll('.title');
+    // ─── Auto-update "Loading..." titles ───
+    // Fetches fresh titles from server without full page reload
+    async function updateLoadingTitles() {
+        const titles = document.querySelectorAll('.queue-item .title');
         let hasLoading = false;
-        titles.forEach(t => { if (t.textContent === 'Loading...') hasLoading = true; });
-        if (hasLoading) location.reload();
-    }, 6000);
-    {% endif %}
+        titles.forEach(t => {
+            if (t.textContent === 'Loading...') hasLoading = true;
+        });
+        if (!hasLoading) return;
+
+        try {
+            const resp = await fetch('/queue');
+            if (!resp.ok) return;
+            const html = await resp.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const newTitles = doc.querySelectorAll('.queue-item .title');
+            const oldItems = document.querySelectorAll('.queue-item');
+            newTitles.forEach((nt, i) => {
+                if (oldItems[i] && nt.textContent !== 'Loading...') {
+                    oldItems[i].querySelector('.title').textContent = nt.textContent;
+                }
+            });
+        } catch (e) {
+            // Silently ignore — next poll will retry
+        }
+    }
+    setInterval(updateLoadingTitles, 6000);
     </script>
 </body>
 </html>
