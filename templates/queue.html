@@ -510,6 +510,7 @@
                     showToast('Added: ' + d.title);
                     btn.textContent = '\u2713';
                     btn.disabled = true;
+                    refreshQueueList();
                 }
             })
             .catch(() => { showToast('Failed', 'error'); btn.disabled = false; btn.textContent = '+ Queue'; });
@@ -530,12 +531,32 @@
             .then(r => {
                 if (r.redirected) {
                     showToast('Song added!');
+                    // Refresh queue list in-place
+                    refreshQueueList();
                 } else {
                     showToast('Failed', 'error');
                 }
             })
             .catch(() => showToast('Failed', 'error'));
     });
+
+    /** Re-fetch the queue card HTML and swap it in without page reload */
+    async function refreshQueueList() {
+        try {
+            const resp = await fetch('/queue');
+            if (!resp.ok) return;
+            const html = await resp.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const newCard = doc.querySelector('.card'); // queue card
+            const oldCard = document.querySelector('.main-col .card');
+            if (newCard && oldCard) {
+                oldCard.outerHTML = newCard.outerHTML;
+            }
+        } catch (e) {
+            // Silently ignore
+        }
+    }
 
     // ─── Auto-update "Loading..." titles ───
     // Only runs when titles are still loading; fetches queue HTML in background
