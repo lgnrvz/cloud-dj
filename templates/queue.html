@@ -341,6 +341,9 @@
 
     /** Load a track — shows spinner while fetching, then plays */
     async function loadTrack(np) {
+        // Set ID immediately to prevent poll race (next interval fires at 4s)
+        currentPlayingId = np.id;
+
         // Clear current source
         video.pause();
         video.removeAttribute('src');
@@ -350,7 +353,6 @@
             videoContainer.style.display = 'none';
             videoLoading.classList.remove('show');
             setStatus('#444', 'Nothing to play');
-            currentPlayingId = np.id;
             return;
         }
 
@@ -402,7 +404,7 @@
             if (qc) qc.textContent = (np.queue_count || 0) + ' in queue';
 
             if (np.id !== null && np.id !== undefined) {
-                if (currentPlayingId !== np.id) {
+                if (currentPlayingId !== np.id && !loadingNext) {
                     await loadTrack(np);
                 }
             }
