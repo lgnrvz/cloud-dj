@@ -98,8 +98,13 @@ def load_user(user_id):
 # ─── HELPERS ───
 
 def get_next_pending():
-    """Return the next pending queue item, or None."""
+    """Return the next pending queue item, or None.
+    Also cleans up stale 'playing' items (stuck from crashes)."""
     conn = get_db()
+    # Reset any stale 'playing' items to 'played' (they never advanced)
+    conn.execute("UPDATE queue SET status='played' WHERE status='playing' AND id != ?",
+                 (NOW_PLAYING.get('id', -1),))
+    conn.commit()
     item = conn.execute(
         "SELECT * FROM queue WHERE status='pending' ORDER BY priority DESC, id ASC LIMIT 1"
     ).fetchone()
