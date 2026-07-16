@@ -225,10 +225,6 @@
 
                 {% if current_user.is_admin %}
                 <div class="player-controls">
-                    <audio id="audioPlayer" controls preload="none"
-                           style="height:36px;width:220px;border-radius:6px;background:#0d0d16;">
-                        Your browser does not support audio playback.
-                    </audio>
                     <button class="skip-btn {% if now.id == -1 %}hidden{% endif %}"
                             onclick="skipTrack()" id="skipBtn" title="Skip to next track">Skip</button>
                 </div>
@@ -236,13 +232,10 @@
             </div>
 
             {% if current_user.is_admin %}
-            <div class="player-bar">
-                <div class="status">
-                    <span class="dot green" id="playerStatusDot"></span>
-                    <span id="playerStatusText">Connected</span>
-                </div>
-                <span style="color:#444;font-size:0.7rem;" id="queueCount">{{ items|length }} in queue</span>
-                <span style="color:#444;font-size:0.7rem;margin-left:auto;" id="nowTime"></span>
+            <div class="player-bar" id="playerBar">
+                <span class="dot green" id="playerStatusDot" style="width:6px;height:6px;border-radius:50%;display:inline-block;"></span>
+                <span style="color:#555;font-size:0.75rem;" id="playerStatusText">Connected</span>
+                <span style="color:#444;font-size:0.7rem;margin-left:8px;" id="queueCount">{{ items|length }} in queue</span>
             </div>
             {% endif %}
 
@@ -253,7 +246,7 @@
                     <span class="lbl">Video</span>
                     <button class="video-toggle" onclick="toggleVideo()">Hide</button>
                 </div>
-                <video id="html5Player" muted playsinline
+                <video id="html5Player" playsinline controls
                        style="width:100%;display:block;background:#000;max-height:270px;"
                        src=""></video>
             </div>
@@ -327,22 +320,19 @@
     // ─── Browser Audio Player (Admin Only) ───
 
     {% if current_user.is_admin %}
-    const audio = document.getElementById('audioPlayer');
+    const video = document.getElementById('html5Player');
+    const videoContainer = document.getElementById('videoContainer');
     const skipBtn = document.getElementById('skipBtn');
     const nowTrack = document.getElementById('nowTrack');
     const nowMeta = document.getElementById('nowMeta');
     const statusDot = document.getElementById('playerStatusDot');
     const statusText = document.getElementById('playerStatusText');
-    const video = document.getElementById('html5Player');
-    const videoContainer = document.getElementById('videoContainer');
 
     let currentPlayingId = null;
-    let isPlaying = false;
-    let currentVideoUrl = null;
     let skipInProgress = false;
 
-    function setStatus(dotClass, text) {
-        statusDot.className = 'dot ' + dotClass;
+    function setStatus(color, text) {
+        statusDot.style.background = color;
         statusText.textContent = text;
     }
 
@@ -361,60 +351,43 @@
         }
     }
 
-    /** Load video from a YouTube URL */
-    function loadVideo(youtubeUrl) {
-        if (!youtubeUrl) {
-            video.src = '';
+    /** Load a track into the video player (which carries audio) */
+    async function loadTrack(np) {
+        // Clear current video source
+        video.pause();
+        video.removeAttribute('src');
+        video.load();
+
+        if (np.id === -1 || !np.video_id) {
+            // Auto-DJ or no video — hide video, show status instead
             videoContainer.style.display = 'none';
-            currentVideoUrl = null;
+            setStatus('#ffd700', 'Auto-DJ playing');
+            currentPlayingId = np.id;
             return;
         }
-        // Don't re-fetch if it's the same URL
-        if (youtubeUrl === currentVideoUrl) return;
-        currentVideoUrl = youtubeUrl;
 
-        fetch('/direct-video?url=' + encodeURIComponent(youtubeUrl))
-            .then(r => r.json())
-            .then(d => {
-                if (d.video_url) {
-                    video.src = d.video_url;
-                    videoContainer.style.display = '';
-                    video.load();
-                    video.play().catch(() => {});
-                } else {
-                    videoContainer.style.display = 'none';
+        // Fetch the direct video URL (with audio)
+        try {
+            const resp = await fetch('/direct-video?url=' + encodeURIComponent(np.url));
+            const d = await resp.json();
+            if (d.video_url) {
+                video.src = d.video_url;
+                videoContainer.style.display = '';
+                video.load();
+                try {
+                    await video.play();
+                    currentPlayingId = np.id;
+                    setStatus('#1db954', 'Playing');
+                } catch (e) {
+                    setStatus('#ffd700', 'Click play');
                 }
-            })
-            .catch(() => {
-                videoContainer.style.display = 'none';
-            });
-    }
-
-    /** Load a new track — stops current, switches source, plays */
-    async function loadTrack(np) {
-        // Stop current audio cleanly
-        audio.pause();
-        audio.removeAttribute('src');
-        audio.load();
-
-        if (np.stream_url) {
-            audio.src = np.stream_url;
-            try {
-                await audio.play();
-                currentPlayingId = np.id;
-                setStatus('green', 'Playing');
-            } catch (e) {
-                setStatus('yellow', 'Click to play');
-            }
-            if (np.video_id) {
-                loadVideo(np.url);
             } else {
-                loadVideo(null);
+                videoContainer.style.display = 'none';
+                setStatus('#ffd700', 'Stream unavailable');
             }
-        } else {
-            currentPlayingId = null;
-            setStatus('gray', 'Waiting');
-            loadVideo(null);
+        } catch (e) {
+            videoContainer.style.display = 'none';
+            setStatus('#444', 'Error loading');
         }
 
         // Update skip button visibility
@@ -433,43 +406,28 @@
             const qc = document.getElementById('queueCount');
             if (qc) qc.textContent = (np.queue_count || 0) + ' in queue';
 
-            // If now-playing changed, switch track
             if (np.id !== null && np.id !== undefined) {
                 if (currentPlayingId !== np.id) {
                     await loadTrack(np);
                 }
             }
         } catch (e) {
-            setStatus('gray', 'Disconnected');
+            setStatus('#444', 'Disconnected');
         }
     }
 
-    /** Advance to next track when current one ends */
-    audio.addEventListener('ended', async function() {
+    /** Advance when current track ends */
+    video.addEventListener('ended', async function() {
         currentPlayingId = null;
-        setStatus('yellow', 'Loading next...');
+        setStatus('#ffd700', 'Loading next...');
         try {
             const resp = await fetch('/advance', { method: 'POST' });
             const np = await resp.json();
             updateNowUi(np.title, np.username);
             await loadTrack(np);
         } catch (e) {
-            setStatus('gray', 'Error advancing');
+            setStatus('#444', 'Error advancing');
         }
-    });
-
-    audio.addEventListener('play', function() {
-        isPlaying = true;
-        setStatus('green', 'Playing');
-    });
-
-    audio.addEventListener('pause', function() {
-        isPlaying = false;
-        if (currentPlayingId) setStatus('yellow', 'Paused');
-    });
-
-    audio.addEventListener('error', function() {
-        setStatus('gray', 'Stream error');
     });
 
     async function skipTrack() {
@@ -479,18 +437,16 @@
         skipBtn.textContent = '...';
 
         try {
-            // Stop current audio first
-            audio.pause();
-            audio.removeAttribute('src');
-            audio.load();
+            video.pause();
+            video.removeAttribute('src');
+            video.load();
 
             const resp = await fetch('/skip');
             const np = await resp.json();
             updateNowUi(np.title, np.username);
             await loadTrack(np);
         } catch (e) {
-            console.error('Skip failed', e);
-            setStatus('gray', 'Skip failed');
+            setStatus('#444', 'Skip failed');
         }
 
         skipBtn.disabled = false;
@@ -500,8 +456,6 @@
 
     // Initial load
     pollNowPlaying();
-
-    // Poll every 4 seconds for changes
     setInterval(pollNowPlaying, 4000);
     {% endif %}
 
