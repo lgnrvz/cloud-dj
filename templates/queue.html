@@ -57,58 +57,42 @@
         .skip-btn:hover { color: #1db954; border-color: #1db95444; background: #1db95411; }
         .skip-btn.hidden { display: none; }
 
-        .player-bar {
-            background: #0d0d16;
-            border: 1px solid #1a1a2e;
-            border-radius: 10px;
-            padding: 12px 18px;
-            margin-bottom: 12px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        .player-bar audio {
-            height: 36px;
-            width: 220px;
-            border-radius: 6px;
-        }
-        .player-bar .status { color: #555; font-size: 0.75rem; display: flex; align-items: center; gap: 6px; }
-        .player-bar .status .dot {
-            width: 6px; height: 6px; border-radius: 50%;
-            display: inline-block;
-        }
-        .player-bar .status .dot.green { background: #1db954; }
-        .player-bar .status .dot.yellow { background: #ffd700; }
-        .player-bar .status .dot.gray { background: #444; }
-
+        /* Video player — full width of main column */
         .video-container {
             background: #0d0d16;
             border: 1px solid #1a1a2e;
             border-radius: 10px;
             overflow: hidden;
             margin-bottom: 16px;
-            max-width: 480px;
+            position: relative;
         }
         .video-container video {
             width: 100%;
             display: block;
             background: #000;
-            max-height: 270px;
+            aspect-ratio: 16 / 9;
+            max-height: 70vh;
         }
-        .video-bar {
-            padding: 10px 14px;
-            border-bottom: 1px solid #1a1a2e;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+        .video-loading {
+            display: none;
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            color: #555;
+            font-size: 0.8rem;
+            text-align: center;
+            z-index: 2;
         }
-        .video-bar .lbl { color: #555; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; }
-        .video-toggle {
-            background: none; border: 1px solid #2a2a3a; cursor: pointer;
-            font-size: 0.65rem; padding: 3px 10px; border-radius: 4px;
-            color: #888; font-family: inherit; transition: .15s;
+        .video-loading .spinner {
+            width: 28px; height: 28px;
+            border: 2px solid #2a2a3a;
+            border-top-color: #1db954;
+            border-radius: 50%;
+            animation: spin .8s linear infinite;
+            margin: 0 auto 8px;
         }
-        .video-toggle:hover { color: #1db954; border-color: #1db95444; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .video-loading.show { display: block; }
 
         .card {
             background: #0d0d16;
@@ -200,6 +184,19 @@
         .flash.success { background: #1db95422; border: 1px solid #1db95444; color: #1db954; }
         .flash.danger { background: #ff333322; border: 1px solid #ff333344; color: #ff4444; }
         .flash.warn { background: #ffd70022; border: 1px solid #ffd70044; color: #ffd700; }
+
+        .status-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 0 0 12px 0;
+            font-size: 0.75rem;
+        }
+        .status-row .dot {
+            width: 6px; height: 6px; border-radius: 50%; display: inline-block;
+        }
+        .status-text { color: #555; }
+        .queue-count { color: #444; margin-left: auto; }
     </style>
 </head>
 <body>
@@ -214,7 +211,7 @@
     <div class="container">
         <!-- Main Column -->
         <div class="main-col">
-            <!-- Now Playing / Player -->
+            <!-- Now Playing -->
             <div class="now-playing">
                 <span class="indicator"></span>
                 <div class="np-content">
@@ -232,22 +229,21 @@
             </div>
 
             {% if current_user.is_admin %}
-            <div class="player-bar" id="playerBar">
-                <span class="dot green" id="playerStatusDot" style="width:6px;height:6px;border-radius:50%;display:inline-block;"></span>
-                <span style="color:#555;font-size:0.75rem;" id="playerStatusText">Connected</span>
-                <span style="color:#444;font-size:0.7rem;margin-left:8px;" id="queueCount">{{ items|length }} in queue</span>
+            <!-- Status row (replaces player-bar) -->
+            <div class="status-row">
+                <span class="dot" id="playerStatusDot" style="background:#1db954;"></span>
+                <span class="status-text" id="playerStatusText">Connected</span>
+                <span class="queue-count" id="queueCount">{{ items|length }} in queue</span>
             </div>
-            {% endif %}
 
             <!-- Video Player -->
-            {% if current_user.is_admin %}
             <div class="video-container" id="videoContainer" style="display:none;">
-                <div class="video-bar">
-                    <span class="lbl">Video</span>
-                    <button class="video-toggle" onclick="toggleVideo()">Hide</button>
+                <div class="video-loading" id="videoLoading">
+                    <div class="spinner"></div>
+                    Loading video...
                 </div>
                 <video id="html5Player" playsinline controls
-                       style="width:100%;display:block;background:#000;max-height:270px;"
+                       style="width:100%;display:block;background:#000;"
                        src=""></video>
             </div>
             {% endif %}
@@ -317,11 +313,12 @@
         setTimeout(() => toast.classList.remove('show'), 3000);
     }
 
-    // ─── Browser Audio Player (Admin Only) ───
+    // ─── Browser Player (Admin Only) ───
 
     {% if current_user.is_admin %}
     const video = document.getElementById('html5Player');
     const videoContainer = document.getElementById('videoContainer');
+    const videoLoading = document.getElementById('videoLoading');
     const skipBtn = document.getElementById('skipBtn');
     const nowTrack = document.getElementById('nowTrack');
     const nowMeta = document.getElementById('nowMeta');
@@ -330,6 +327,7 @@
 
     let currentPlayingId = null;
     let skipInProgress = false;
+    let loadingNext = false;
 
     function setStatus(color, text) {
         statusDot.style.background = color;
@@ -341,38 +339,33 @@
         nowMeta.textContent = username;
     }
 
-    function toggleVideo() {
-        if (video.style.display === 'none') {
-            video.style.display = 'block';
-            document.querySelector('.video-toggle').textContent = 'Hide';
-        } else {
-            video.style.display = 'none';
-            document.querySelector('.video-toggle').textContent = 'Show';
-        }
-    }
-
-    /** Load a track into the video player (which carries audio) */
+    /** Load a track — shows spinner while fetching, then plays */
     async function loadTrack(np) {
-        // Clear current video source
+        // Clear current source
         video.pause();
         video.removeAttribute('src');
         video.load();
 
         if (!np.url || !np.video_id) {
-            // Nothing playable
             videoContainer.style.display = 'none';
+            videoLoading.classList.remove('show');
             setStatus('#444', 'Nothing to play');
             currentPlayingId = np.id;
             return;
         }
 
-        // Fetch the direct video URL (with audio) — works for both queue and Auto-DJ
+        // Show loading spinner
+        videoContainer.style.display = '';
+        videoLoading.classList.add('show');
+        setStatus('#ffd700', 'Loading...');
+
         try {
             const resp = await fetch('/direct-video?url=' + encodeURIComponent(np.url));
             const d = await resp.json();
+            videoLoading.classList.remove('show');
+
             if (d.video_url) {
                 video.src = d.video_url;
-                videoContainer.style.display = '';
                 video.load();
                 try {
                     await video.play();
@@ -386,18 +379,19 @@
                 setStatus('#ffd700', 'Stream unavailable');
             }
         } catch (e) {
+            videoLoading.classList.remove('show');
             videoContainer.style.display = 'none';
             setStatus('#444', 'Error loading');
         }
 
-        // Skip button: hidden only for idle Auto-DJ with no pending queue
+        // Skip button
         if (skipBtn) {
             const hideSkip = np.is_auto_dj && (np.queue_count === 0);
             skipBtn.classList.toggle('hidden', hideSkip);
         }
     }
 
-    /** Poll now-playing and react to changes */
+    /** Poll now-playing */
     async function pollNowPlaying() {
         try {
             const resp = await fetch('/now-playing');
@@ -417,9 +411,10 @@
         }
     }
 
-    /** Advance when current track ends */
+    /** Advance when track ends */
     video.addEventListener('ended', async function() {
         currentPlayingId = null;
+        loadingNext = true;
         setStatus('#ffd700', 'Loading next...');
         try {
             const resp = await fetch('/advance', { method: 'POST' });
@@ -429,6 +424,7 @@
         } catch (e) {
             setStatus('#444', 'Error advancing');
         }
+        loadingNext = false;
     });
 
     async function skipTrack() {
@@ -436,12 +432,10 @@
         skipInProgress = true;
         skipBtn.disabled = true;
         skipBtn.textContent = '...';
-
         try {
             video.pause();
             video.removeAttribute('src');
             video.load();
-
             const resp = await fetch('/skip');
             const np = await resp.json();
             updateNowUi(np.title, np.username);
@@ -449,7 +443,6 @@
         } catch (e) {
             setStatus('#444', 'Skip failed');
         }
-
         skipBtn.disabled = false;
         skipBtn.textContent = 'Skip';
         skipInProgress = false;
@@ -485,7 +478,6 @@
                     showToast('Added: ' + d.title);
                     btn.textContent = '\u2713';
                     btn.disabled = true;
-                    // Update queue count via polling
                 }
             })
             .catch(() => { showToast('Failed', 'error'); btn.disabled = false; btn.textContent = '+ Queue'; });
@@ -506,7 +498,6 @@
             .then(r => {
                 if (r.redirected) {
                     showToast('Song added!');
-                    // Don't reload — polling will update queue display
                 } else {
                     showToast('Failed', 'error');
                 }
@@ -515,7 +506,7 @@
     });
 
     // ─── Auto-update "Loading..." titles ───
-    // Fetches fresh titles from server without full page reload
+    // Only runs when titles are still loading; fetches queue HTML in background
     async function updateLoadingTitles() {
         const titles = document.querySelectorAll('.queue-item .title');
         let hasLoading = false;
@@ -526,8 +517,11 @@
 
         try {
             const resp = await fetch('/queue');
-            if (!resp.ok) return;
+            // Only parse if we got HTML (not a redirect to login)
+            if (!resp.ok || !resp.headers.get('content-type')?.includes('text/html')) return;
             const html = await resp.text();
+            // Verify it's actually the queue page (has our brand)
+            if (!html.includes('Cloud<span>DJ</span>')) return;
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
             const newTitles = doc.querySelectorAll('.queue-item .title');
@@ -538,7 +532,7 @@
                 }
             });
         } catch (e) {
-            // Silently ignore — next poll will retry
+            // Silently ignore
         }
     }
     setInterval(updateLoadingTitles, 6000);
