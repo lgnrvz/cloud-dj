@@ -13,7 +13,7 @@ login_manager.init_app(app)
 login_manager.login_view = 'login'
 
 DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database.db')
-NOW_PLAYING = {'id': None, 'url': None, 'title': 'Nothing playing', 'username': '-', 'stream_url': None}
+NOW_PLAYING = {'id': None, 'url': None, 'title': 'Nothing playing', 'username': '-', 'is_auto_dj': False}
 
 NODE_PATH = '/home/raspberrypi/.local/bin/node'
 YTDLP = '/usr/local/bin/yt-dlp'
@@ -107,36 +107,36 @@ def get_next_pending():
     return item
 
 def set_now_playing(item):
-    """Update NOW_PLAYING from a queue item (dict/Row) or None (-> Auto-DJ)."""
+    """Update NOW_PLAYING from a queue item (dict/Row) or None (-> Auto-DJ from history)."""
     global NOW_PLAYING
     if item is None:
-        NOW_PLAYING = {
-            'id': -1,
-            'url': None,
-            'title': 'Auto-DJ',
-            'username': 'Cloud DJ',
-            'stream_url': '/stream/auto-dj'
-        }
+        # Auto-DJ: shuffle a random previously played song
+        conn = get_db()
+        played = conn.execute(
+            "SELECT * FROM queue WHERE status='played' ORDER BY RANDOM() LIMIT 1"
+        ).fetchone()
+        conn.close()
+        if played:
+            NOW_PLAYING = {
+                'id': -1,
+                'url': played['clean_url'] or played['youtube_url'],
+                'title': 'Auto-DJ: ' + (played['title'] or 'Unknown'),
+                'username': 'Cloud DJ',
+                'is_auto_dj': True
+            }
+        else:
+            NOW_PLAYING = {
+                'id': None, 'url': None, 'title': 'Nothing playing',
+                'username': '-', 'is_auto_dj': False
+            }
     else:
         NOW_PLAYING = {
             'id': item['id'],
             'url': item['clean_url'] or item['youtube_url'],
             'title': item['title'],
             'username': item['username'],
-            'stream_url': f"/stream/{item['id']}"
+            'is_auto_dj': False
         }
-
-# ─── AUTO-DJ ───
-
-AUTO_DJ_SEARCHES = [
-    "ytsearch:best upbeat party mix 2026",
-    "ytsearch:feel good music mix 2026",
-    "ytsearch:upbeat happy music mix",
-    "ytsearch:dance pop mix 2026",
-    "ytsearch:energetic workout music mix",
-    "ytsearch:chill electronic mix 2026",
-    "ytsearch:indie pop hits mix",
-]
 
 # ─── ROUTES ───
 
@@ -208,10 +208,10 @@ def queue():
     return render_template('queue.html', items=items, played=played, loved=loved, now=_enrich_now(dict(NOW_PLAYING)))
 
 def _auto_start():
-    """Advance to first pending item if nothing is playing."""
+    """Advance to first pending item, or Auto-DJ from history."""
     next_item = get_next_pending()
+    set_now_playing(next_item)  # Falls to Auto-DJ if None
     if next_item:
-        set_now_playing(next_item)
         conn = get_db()
         conn.execute("UPDATE queue SET status='playing' WHERE id=?", (next_item['id'],))
         conn.commit()
@@ -387,41 +387,6 @@ def stream_audio(item_id):
         proc = subprocess.Popen(
             [YTDLP, '--js-runtimes', f'node:{NODE_PATH}',
              '-f', 'bestaudio', '-q', '-o', '-', url],
-            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-            preexec_fn=os.setsid
-        )
-        try:
-            while True:
-                data = proc.stdout.read(16384)
-                if not data:
-                    break
-                yield data
-        finally:
-            try:
-                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-            except:
-                pass
-            proc.wait()
-
-    return Response(
-        stream_with_context(generate()),
-        mimetype='audio/webm; codecs="opus"',
-        headers={
-            'Content-Disposition': 'inline',
-            'Accept-Ranges': 'none',
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-        }
-    )
-
-@app.route('/stream/auto-dj')
-def stream_auto_dj():
-    """Stream a random upbeat mix from YouTube."""
-    search = random.choice(AUTO_DJ_SEARCHES)
-
-    def generate():
-        proc = subprocess.Popen(
-            [YTDLP, '--js-runtimes', f'node:{NODE_PATH}',
-             '-f', 'bestaudio', '-q', '-o', '-', search],
             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
             preexec_fn=os.setsid
         )

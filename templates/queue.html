@@ -225,7 +225,7 @@
 
                 {% if current_user.is_admin %}
                 <div class="player-controls">
-                    <button class="skip-btn {% if now.id == -1 %}hidden{% endif %}"
+                    <button class="skip-btn hidden"
                             onclick="skipTrack()" id="skipBtn" title="Skip to next track">Skip</button>
                 </div>
                 {% endif %}
@@ -358,15 +358,15 @@
         video.removeAttribute('src');
         video.load();
 
-        if (np.id === -1 || !np.video_id) {
-            // Auto-DJ or no video — hide video, show status instead
+        if (!np.url || !np.video_id) {
+            // Nothing playable
             videoContainer.style.display = 'none';
-            setStatus('#ffd700', 'Auto-DJ playing');
+            setStatus('#444', 'Nothing to play');
             currentPlayingId = np.id;
             return;
         }
 
-        // Fetch the direct video URL (with audio)
+        // Fetch the direct video URL (with audio) — works for both queue and Auto-DJ
         try {
             const resp = await fetch('/direct-video?url=' + encodeURIComponent(np.url));
             const d = await resp.json();
@@ -390,9 +390,10 @@
             setStatus('#444', 'Error loading');
         }
 
-        // Update skip button visibility
+        // Skip button: hidden only for idle Auto-DJ with no pending queue
         if (skipBtn) {
-            skipBtn.classList.toggle('hidden', np.id === -1 || np.id === null);
+            const hideSkip = np.is_auto_dj && (np.queue_count === 0);
+            skipBtn.classList.toggle('hidden', hideSkip);
         }
     }
 
