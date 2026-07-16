@@ -562,27 +562,34 @@
     function submitPaste() {
         const input = document.getElementById('pasteInput');
         const text = input.value.trim();
+        console.log('[submitPaste] text:', text ? text.substring(0, 40) + '...' : '(empty)');
         if (!text) { showToast('Paste a YouTube link first', 'warn'); return; }
         const ytMatch = text.match(/(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/);
         if (!ytMatch) { showToast('Not a valid YouTube link', 'warn'); return; }
+        console.log('[submitPaste] matched YouTube URL, submitting...');
         showToast('Adding song...', 'warn');
         const formData = new FormData();
         formData.append('url', text);
         fetch('/add', { method: 'POST', body: formData })
             .then(r => {
-                if (r.redirected) {
+                console.log('[submitPaste] response:', r.status, r.redirected, r.url);
+                // Must check the FINAL URL after redirects — /login means not authenticated
+                if (r.redirected && r.url && !r.url.includes('/login')) {
                     showToast('Song added!');
                     input.value = '';
                     refreshQueueList();
+                } else if (r.redirected && r.url && r.url.includes('/login')) {
+                    showToast('Session expired, log in again', 'error');
                 } else {
                     showToast('Failed', 'error');
                 }
             })
-            .catch(() => showToast('Failed', 'error'));
+            .catch(e => { console.error('[submitPaste] fetch error:', e); showToast('Failed', 'error'); });
     }
 
     // Auto-submit on paste into the quick-add input
-    document.getElementById('pasteInput').addEventListener('paste', function() {
+    document.getElementById('pasteInput').addEventListener('paste', function(e) {
+        console.log('[pasteInput] paste event fired, target:', e.target.id);
         // Small delay so the pasted text is available
         setTimeout(submitPaste, 50);
     });
