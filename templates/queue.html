@@ -324,8 +324,8 @@
                 {% endif %}
             </div>
             <!-- Paste to Add Card -->
-            <div class="card paste-card" onclick="quickPaste()">
-                <div class="paste-icon">
+            <div class="card paste-card" id="pasteCard" onclick="quickPaste()">
+                <div class="paste-icon" id="pasteIcon">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                         <rect x="8" y="2" width="8" height="4" rx="1"/>
                         <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
@@ -333,7 +333,8 @@
                         <path d="M9 14l3 3 3-3"/>
                     </svg>
                 </div>
-                <div class="paste-label">Tap to paste a YouTube link</div>
+                <div class="paste-label" id="pasteLabel">Tap to paste a YouTube link</div>
+                <input type="text" id="pasteInput" style="display:none;width:100%;padding:8px 10px;border-radius:6px;border:1px solid #2a2a3a;background:#1a1a2a;color:#e0e0e8;font-family:'Inter',sans-serif;font-size:0.8rem;outline:none;margin-top:4px;" placeholder="Paste YouTube link here...">
             </div>
         </div>
     </div>
@@ -593,29 +594,82 @@
             .catch(() => showToast('Failed', 'error'));
     });
 
-    /** Quick paste button — reads clipboard and submits */
-    async function quickPaste() {
-        try {
-            const text = await navigator.clipboard.readText();
-            if (!text) { showToast('Clipboard is empty', 'warn'); return; }
-            const ytMatch = text.match(/(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/);
-            if (!ytMatch) { showToast('No YouTube link in clipboard', 'warn'); return; }
-            showToast('Adding song...', 'warn');
-            const formData = new FormData();
-            formData.append('url', text.trim());
-            fetch('/add', { method: 'POST', body: formData })
-                .then(r => {
-                    if (r.redirected) {
-                        showToast('Song added!');
-                        refreshQueueList();
-                    } else {
-                        showToast('Failed', 'error');
-                    }
-                })
-                .catch(() => showToast('Failed', 'error'));
-        } catch (e) {
-            showToast('Cannot read clipboard', 'error');
-        }
+    /** Quick paste — shows an input field, auto-submits on paste */
+    function quickPaste() {
+        const card = document.getElementById('pasteCard');
+        const icon = document.getElementById('pasteIcon');
+        const label = document.getElementById('pasteLabel');
+        const input = document.getElementById('pasteInput');
+
+        if (input.style.display === 'block') return; // already open
+
+        // Show input, hide icon+label
+        icon.style.display = 'none';
+        label.style.display = 'none';
+        input.style.display = 'block';
+        input.value = '';
+        input.focus();
+
+        // Auto-submit on paste
+        input.addEventListener('paste', function onPaste(e) {
+            setTimeout(() => {
+                const text = input.value.trim();
+                const ytMatch = text.match(/(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/);
+                if (!ytMatch) return; // wait for more input
+                submitPaste(text);
+                // Reset card
+                input.style.display = 'none';
+                icon.style.display = '';
+                label.style.display = '';
+                input.removeEventListener('paste', onPaste);
+            }, 50);
+        }, {once: true});
+
+        // Also submit on Enter
+        input.onkeydown = function(e) {
+            if (e.key === 'Enter') {
+                const text = input.value.trim();
+                const ytMatch = text.match(/(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/);
+                if (ytMatch) {
+                    submitPaste(text);
+                } else {
+                    showToast('Not a valid YouTube link', 'warn');
+                }
+                input.style.display = 'none';
+                icon.style.display = '';
+                label.style.display = '';
+                input.onkeydown = null;
+            }
+        };
+
+        // Cancel on blur (click outside)
+        setTimeout(() => {
+            input.onblur = function() {
+                if (!input.value.trim()) {
+                    input.style.display = 'none';
+                    icon.style.display = '';
+                    label.style.display = '';
+                    input.onblur = null;
+                    input.onkeydown = null;
+                }
+            };
+        }, 200);
+    }
+
+    function submitPaste(url) {
+        showToast('Adding song...', 'warn');
+        const formData = new FormData();
+        formData.append('url', url);
+        fetch('/add', { method: 'POST', body: formData })
+            .then(r => {
+                if (r.redirected) {
+                    showToast('Song added!');
+                    refreshQueueList();
+                } else {
+                    showToast('Failed', 'error');
+                }
+            })
+            .catch(() => showToast('Failed', 'error'));
     }
 
     /** Re-fetch the loved songs card HTML and swap it in */
