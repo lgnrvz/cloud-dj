@@ -560,8 +560,8 @@
     // ─── Paste to Add ───
 
     document.addEventListener('paste', function(e) {
-        // Ignore if pasting into the quick-add input (handled by Add button)
-        if (e.target && e.target.id === 'pasteInput') return;
+        // Ignore if pasting into any input/textarea (handled by the field itself)
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
         const text = (e.clipboardData || window.clipboardData).getData('text');
         if (!text) return;
         const ytMatch = text.match(/(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/);
