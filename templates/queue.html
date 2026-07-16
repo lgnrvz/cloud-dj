@@ -558,15 +558,14 @@
     }
 
     // ─── Paste to Add ───
-
+    // Catches paste anywhere on the page (desktop) or in the input (mobile)
     document.addEventListener('paste', function(e) {
-        // Ignore if pasting into any input/textarea (handled by the field itself)
-        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
         const text = (e.clipboardData || window.clipboardData).getData('text');
         if (!text) return;
         const ytMatch = text.match(/(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/);
         if (!ytMatch) return;
-        e.preventDefault();
+        // Don't prevent default — let the paste go through naturally.
+        // The input field's own paste handler will also pick it up.
         showToast('Adding song...', 'warn');
         const formData = new FormData();
         formData.append('url', text.trim());
@@ -574,7 +573,6 @@
             .then(r => {
                 if (r.redirected) {
                     showToast('Song added!');
-                    // Refresh queue list in-place
                     refreshQueueList();
                 } else {
                     showToast('Failed', 'error');
