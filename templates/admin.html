@@ -89,6 +89,26 @@
         .srv-info { font-size: 0.8rem; color: #555; line-height: 1.8; }
         .srv-info strong { color: #888; }
         .empty { text-align: center; padding: 32px; color: #444; font-size: 0.85rem; }
+
+        .clr-btn {
+            font-family: 'Inter', sans-serif;
+            padding: 6px 14px;
+            border-radius: 5px;
+            border: 1px solid #ff333344;
+            background: #ff333322;
+            color: #ff4444;
+            font-size: 0.7rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: .15s;
+        }
+        .clr-btn:hover { background: #ff333344; }
+        .del-btn {
+            background: none; border: none; cursor: pointer;
+            font-size: 0.75rem; padding: 2px 5px; transition: .15s;
+            color: #444; font-family: inherit; line-height: 1;
+        }
+        .del-btn:hover { color: #ff4444; }
     </style>
 </head>
 <body>
@@ -114,6 +134,12 @@
         <div>
                 <div class="card">
                     <h2>History</h2>
+                    <div style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+                        <span style="color:#444;font-size:0.7rem;">{{ history|length }} played</span>
+                        {% if history|length > 0 %}
+                        <button class="clr-btn" onclick="clearHistory()">Clear All</button>
+                        {% endif %}
+                    </div>
                     {% if history|length == 0 %}
                         <div class="empty">No played songs yet</div>
                     {% else %}
@@ -126,9 +152,10 @@
                                     <span>{{ item.created_at }}</span>
                                 </div>
                             </div>
-                            <div style="display:flex;align-items:center;gap:6px;">
+                            <div style="display:flex;align-items:center;gap:4px;">
                                 <span class="req-badge">{{ item.request_count }}x</span>
                                 <a href="{{ item.clean_url or item.youtube_url }}" target="_blank" class="view-btn">View</a>
+                                <button class="del-btn" onclick="deleteHistoryItem({{ item.id }})" title="Delete">&#x2715;</button>
                             </div>
                         </div>
                         {% endfor %}
@@ -171,6 +198,18 @@
             npMeta.textContent = d.username;
         }).catch(() => {});
     }, 5000);
+
+    function clearHistory() {
+        if (!confirm('Delete all history? This cannot be undone.')) return;
+        fetch('/admin/clear-history', { method: 'POST' })
+            .then(() => location.reload());
+    }
+
+    function deleteHistoryItem(id) {
+        if (!confirm('Delete this history entry?')) return;
+        fetch('/admin/remove/' + id, { method: 'POST' })
+            .then(() => location.reload());
+    }
     </script>
 </body>
 </html>

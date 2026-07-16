@@ -371,6 +371,23 @@ def add_from_loved(loved_id):
 
     return jsonify({'success': True, 'title': song['title']})
 
+@app.route('/loved/remove/<int:loved_id>', methods=['POST'])
+@login_required
+def remove_loved(loved_id):
+    """Delete a loved song from the user's list."""
+    conn = get_db()
+    song = conn.execute(
+        "SELECT * FROM loved_songs WHERE id=? AND user_id=?",
+        (loved_id, current_user.id)
+    ).fetchone()
+    if not song:
+        conn.close()
+        return jsonify({'error': 'Not found'}), 404
+    conn.execute("DELETE FROM loved_songs WHERE id=?", (loved_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True})
+
 # ─── STREAMING ───
 
 @app.route('/stream/<int:item_id>')
@@ -558,6 +575,18 @@ def remove_item(item_id):
             'now': _enrich_now(dict(NOW_PLAYING))
         })
 
+    return jsonify({'success': True})
+
+@app.route('/admin/clear-history', methods=['POST'])
+@login_required
+def clear_history():
+    """Delete all played queue entries."""
+    if not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized'}), 403
+    conn = get_db()
+    conn.execute("DELETE FROM queue WHERE status='played'")
+    conn.commit()
+    conn.close()
     return jsonify({'success': True})
 
 @app.route('/admin/reorder', methods=['POST'])

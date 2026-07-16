@@ -295,7 +295,10 @@
                     {% for s in loved %}
                     <div class="loved-item">
                         <div class="title">{{ s.title }} <span class="meta">{{ s.loved_at[:10] }}</span></div>
-                        <button class="add-btn" onclick="addLoved({{ s.id }}, this)">+ Queue</button>
+                        <div style="display:flex;gap:4px;align-items:center;">
+                            <button class="add-btn" onclick="addLoved({{ s.id }}, this)">+ Queue</button>
+                            <button class="del-btn" data-id="{{ s.id }}" onclick="removeLoved({{ s.id }}, this)" style="background:none;border:none;color:#444;cursor:pointer;font-size:0.8rem;padding:2px 4px;transition:.15s;font-family:inherit;" onmouseover="this.style.color='#ff4444'" onmouseout="this.style.color='#444'">&#x2715;</button>
+                        </div>
                     </div>
                     {% endfor %}
                 {% endif %}
@@ -497,7 +500,22 @@
                 if (d.loved) { btn.classList.add('loved'); btn.innerHTML = '&#9829;'; }
                 else { btn.classList.remove('loved'); btn.innerHTML = '&#9825;'; }
                 showToast(d.loved ? 'Loved!' : 'Unloved');
+                refreshLovedSongs();
             });
+    }
+
+    function removeLoved(id, btn) {
+        if (!confirm('Remove from loved songs?')) return;
+        btn.disabled = true;
+        fetch('/loved/remove/' + id, { method: 'POST' })
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) {
+                    showToast('Removed');
+                    refreshLovedSongs();
+                }
+            })
+            .catch(() => showToast('Failed', 'error'));
     }
 
     function addLoved(id, btn) {
@@ -542,6 +560,26 @@
             })
             .catch(() => showToast('Failed', 'error'));
     });
+
+    /** Re-fetch the loved songs card HTML and swap it in */
+    async function refreshLovedSongs() {
+        try {
+            const resp = await fetch('/queue');
+            if (!resp.ok) return;
+            const html = await resp.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const newLoved = doc.querySelector('.side-col .card');
+            const oldLoved = document.querySelector('.side-col .card');
+            if (newLoved && oldLoved) {
+                oldLoved.outerHTML = newLoved.outerHTML;
+                // Re-bind delete handlers for new buttons
+                document.querySelectorAll('.loved-item .del-btn').forEach(el => {
+                    el.onclick = function() { removeLoved(parseInt(this.dataset.id), this); };
+                });
+            }
+        } catch (e) {}
+    }
 
     /** Re-fetch the queue card HTML and swap it in without page reload */
     async function refreshQueueList() {
