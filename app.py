@@ -486,9 +486,9 @@ def skip():
         # Auto-DJ: just get a new auto-DJ stream
         pass
     elif current_id and current_id > 0:
-        # Put it back as pending (it'll re-queue at the end)
+        # Mark as played (skip = done with this song)
         conn = get_db()
-        conn.execute("UPDATE queue SET status='pending' WHERE id=?", (current_id,))
+        conn.execute("UPDATE queue SET status='played' WHERE id=?", (current_id,))
         conn.commit()
         conn.close()
 
