@@ -513,9 +513,13 @@ def admin():
     items = conn.execute(
         "SELECT * FROM queue WHERE status != 'played' ORDER BY priority DESC, id ASC"
     ).fetchall()
-    history = conn.execute(
-        "SELECT * FROM queue WHERE status='played' ORDER BY id DESC LIMIT 30"
-    ).fetchall()
+    history = conn.execute("""
+        SELECT q.*,
+            (SELECT COUNT(*) FROM queue WHERE clean_url = q.clean_url) as request_count
+        FROM queue q
+        WHERE q.status='played'
+        ORDER BY q.id DESC LIMIT 50
+    """).fetchall()
     users = conn.execute("SELECT * FROM users ORDER BY id DESC").fetchall()
     conn.close()
     return render_template('admin.html', items=items, history=history, users=users, now=dict(NOW_PLAYING))
