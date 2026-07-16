@@ -202,11 +202,35 @@ def queue():
         (current_user.id,)
     ).fetchall()
     conn.close()
-    return render_template('queue.html', items=items, played=played, loved=loved, now=dict(NOW_PLAYING))
+    # Auto-start: if nothing is playing but there are pending items, advance
+    if NOW_PLAYING.get('id') is None:
+        _auto_start()
+    return render_template('queue.html', items=items, played=played, loved=loved, now=_enrich_now(dict(NOW_PLAYING)))
+
+def _auto_start():
+    """Advance to first pending item if nothing is playing."""
+    next_item = get_next_pending()
+    if next_item:
+        set_now_playing(next_item)
+        conn = get_db()
+        conn.execute("UPDATE queue SET status='playing' WHERE id=?", (next_item['id'],))
+        conn.commit()
+        conn.close()
+
+def _enrich_now(np):
+    """Add video_id and other computed fields to a now-playing dict."""
+    if np.get('url'):
+        m = re.search(r'(?:v=|/)([\w-]{11})(?:\?|&|$)', np['url'])
+        if m:
+            np['video_id'] = m.group(1)
+    return np
 
 @app.route('/now-playing')
 def now_playing():
-    np = dict(NOW_PLAYING)
+    # Auto-start if nothing playing but pending items exist
+    if NOW_PLAYING.get('id') is None:
+        _auto_start()
+    np = _enrich_now(dict(NOW_PLAYING))
     conn = get_db()
     items = conn.execute(
         "SELECT COUNT(*) as c FROM queue WHERE status='pending'"
@@ -424,6 +448,26 @@ def stream_auto_dj():
         }
     )
 
+@app.route('/direct-video')
+def direct_video():
+    """Return a direct Google video URL for browser HTML5 <video> playback."""
+    url = request.args.get('url', '')
+    m = re.search(r'(?:v=|/)([\w-]{11})(?:\?|&|$)', url)
+    if not m:
+        return jsonify({'error': 'Invalid URL'}), 400
+    try:
+        result = subprocess.run(
+            [YTDLP, '--js-runtimes', f'node:{NODE_PATH}',
+             '-g', '-f', 'best[height<=720]', url],
+            capture_output=True, text=True, timeout=15
+        )
+        video_url = result.stdout.strip().split('\n')[0]
+        if video_url:
+            return jsonify({'video_url': video_url, 'video_id': m.group(1)})
+    except:
+        pass
+    return jsonify({'error': 'Failed to get video URL'}), 500
+
 # ─── PLAYER ADVANCEMENT ───
 
 @app.route('/advance', methods=['POST'])
@@ -510,12 +554,37 @@ def admin():
 @app.route('/admin/remove/<int:item_id>', methods=['POST'])
 @login_required
 def remove_item(item_id):
+    global NOW_PLAYING
     if not current_user.is_admin:
         return jsonify({'error': 'Unauthorized'}), 403
     conn = get_db()
+    item = conn.execute("SELECT * FROM queue WHERE id=?", (item_id,)).fetchone()
+    if not item:
+        conn.close()
+        return jsonify({'error': 'Not found'}), 404
+
+    # Check if this is the currently playing item
+    is_current = (NOW_PLAYING.get('id') == item_id)
+
     conn.execute("DELETE FROM queue WHERE id=?", (item_id,))
     conn.commit()
     conn.close()
+
+    if is_current:
+        # Auto-advance: find next item or fall to Auto-DJ
+        next_item = get_next_pending()
+        set_now_playing(next_item)
+        if next_item:
+            conn = get_db()
+            conn.execute("UPDATE queue SET status='playing' WHERE id=?", (next_item['id'],))
+            conn.commit()
+            conn.close()
+        return jsonify({
+            'success': True,
+            'auto_advance': True,
+            'now': _enrich_now(dict(NOW_PLAYING))
+        })
+
     return jsonify({'success': True})
 
 @app.route('/admin/reorder', methods=['POST'])

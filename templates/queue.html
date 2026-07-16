@@ -35,7 +35,7 @@
             border: 1px solid #1db95433;
             border-radius: 10px;
             padding: 16px 20px;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
             display: flex;
             align-items: center;
             gap: 14px;
@@ -46,19 +46,69 @@
         .now-playing .label { color: #1db954; font-weight: 600; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; }
         .now-playing .track { color: #fff; font-weight: 700; font-size: 1rem; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .now-playing .meta { color: #666; font-size: 0.75rem; margin-top: 2px; }
-        .now-player {
-            flex-shrink: 0;
+        .player-controls { display: flex; align-items: center; gap: 8px; }
+
+        .skip-btn {
+            background: none; border: 1px solid #2a2a3a; cursor: pointer;
+            font-size: 0.7rem; padding: 6px 12px; border-radius: 5px;
+            color: #888; font-family: inherit; transition: .2s;
+            text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .skip-btn:hover { color: #1db954; border-color: #1db95444; background: #1db95411; }
+        .skip-btn.hidden { display: none; }
+
+        .player-bar {
+            background: #0d0d16;
+            border: 1px solid #1a1a2e;
+            border-radius: 10px;
+            padding: 12px 18px;
+            margin-bottom: 12px;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
         }
-        .now-player audio {
+        .player-bar audio {
             height: 36px;
             width: 220px;
             border-radius: 6px;
         }
-        .now-player audio::-webkit-media-controls-panel { background: #0d0d16; }
-        .np-label { color: #555; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.5px; }
+        .player-bar .status { color: #555; font-size: 0.75rem; display: flex; align-items: center; gap: 6px; }
+        .player-bar .status .dot {
+            width: 6px; height: 6px; border-radius: 50%;
+            display: inline-block;
+        }
+        .player-bar .status .dot.green { background: #1db954; }
+        .player-bar .status .dot.yellow { background: #ffd700; }
+        .player-bar .status .dot.gray { background: #444; }
+
+        .video-container {
+            background: #0d0d16;
+            border: 1px solid #1a1a2e;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 16px;
+            max-width: 480px;
+        }
+        .video-container video {
+            width: 100%;
+            display: block;
+            background: #000;
+            max-height: 270px;
+        }
+        .video-bar {
+            padding: 10px 14px;
+            border-bottom: 1px solid #1a1a2e;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .video-bar .lbl { color: #555; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; }
+        .video-toggle {
+            background: none; border: 1px solid #2a2a3a; cursor: pointer;
+            font-size: 0.65rem; padding: 3px 10px; border-radius: 4px;
+            color: #888; font-family: inherit; transition: .15s;
+        }
+        .video-toggle:hover { color: #1db954; border-color: #1db95444; }
 
         .card {
             background: #0d0d16;
@@ -130,38 +180,6 @@
         .loved-item .title { font-size: 0.8rem; color: #d0d0d8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
         .loved-item .meta { font-size: 0.65rem; color: #444; }
 
-        .skip-btn {
-            background: none; border: 1px solid #2a2a3a; cursor: pointer;
-            font-size: 0.7rem; padding: 6px 12px; border-radius: 5px;
-            color: #888; font-family: inherit; transition: .2s;
-            text-transform: uppercase; letter-spacing: 0.5px;
-        }
-        .skip-btn:hover { color: #1db954; border-color: #1db95444; background: #1db95411; }
-
-        .player-bar {
-            background: #0d0d16;
-            border: 1px solid #1a1a2e;
-            border-radius: 10px;
-            padding: 12px 18px;
-            margin-bottom: 16px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        .player-bar audio {
-            height: 36px;
-            flex: 1;
-            max-width: 300px;
-        }
-        .player-bar .status { color: #555; font-size: 0.75rem; display: flex; align-items: center; gap: 6px; }
-        .player-bar .status .dot {
-            width: 6px; height: 6px; border-radius: 50%;
-            display: inline-block;
-        }
-        .player-bar .status .dot.green { background: #1db954; }
-        .player-bar .status .dot.yellow { background: #ffd700; }
-        .player-bar .status .dot.gray { background: #444; }
-
         .toast {
             position: fixed; bottom: 24px; right: 24px;
             background: #1db954; color: #000;
@@ -175,7 +193,13 @@
         .toast.error { background: #ff3333; color: #fff; }
         .toast.warn { background: #ffd700; color: #000; }
 
-        .player-controls { display: flex; align-items: center; gap: 8px; }
+        .flash {
+            padding: 10px 16px; border-radius: 6px; margin-bottom: 12px;
+            font-size: 0.8rem;
+        }
+        .flash.success { background: #1db95422; border: 1px solid #1db95444; color: #1db954; }
+        .flash.danger { background: #ff333322; border: 1px solid #ff333344; color: #ff4444; }
+        .flash.warn { background: #ffd70022; border: 1px solid #ffd70044; color: #ffd700; }
     </style>
 </head>
 <body>
@@ -205,7 +229,8 @@
                            style="height:36px;width:220px;border-radius:6px;background:#0d0d16;">
                         Your browser does not support audio playback.
                     </audio>
-                    <button class="skip-btn" onclick="skipTrack()" id="skipBtn" title="Skip to next track">Skip</button>
+                    <button class="skip-btn {% if now.id == -1 %}hidden{% endif %}"
+                            onclick="skipTrack()" id="skipBtn" title="Skip to next track">Skip</button>
                 </div>
                 {% endif %}
             </div>
@@ -217,6 +242,20 @@
                     <span id="playerStatusText">Connected</span>
                 </div>
                 <span style="color:#444;font-size:0.7rem;" id="queueCount">{{ items|length }} in queue</span>
+                <span style="color:#444;font-size:0.7rem;margin-left:auto;" id="nowTime"></span>
+            </div>
+            {% endif %}
+
+            <!-- Video Player -->
+            {% if current_user.is_admin %}
+            <div class="video-container" id="videoContainer" style="display:none;">
+                <div class="video-bar">
+                    <span class="lbl">Video</span>
+                    <button class="video-toggle" onclick="toggleVideo()">Hide</button>
+                </div>
+                <video id="html5Player" muted playsinline
+                       style="width:100%;display:block;background:#000;max-height:270px;"
+                       src=""></video>
             </div>
             {% endif %}
 
@@ -294,9 +333,13 @@
     const nowMeta = document.getElementById('nowMeta');
     const statusDot = document.getElementById('playerStatusDot');
     const statusText = document.getElementById('playerStatusText');
+    const video = document.getElementById('html5Player');
+    const videoContainer = document.getElementById('videoContainer');
 
     let currentPlayingId = null;
     let isPlaying = false;
+    let currentVideoUrl = null;
+    let skipInProgress = false;
 
     function setStatus(dotClass, text) {
         statusDot.className = 'dot ' + dotClass;
@@ -308,6 +351,78 @@
         nowMeta.textContent = username;
     }
 
+    function toggleVideo() {
+        if (video.style.display === 'none') {
+            video.style.display = 'block';
+            document.querySelector('.video-toggle').textContent = 'Hide';
+        } else {
+            video.style.display = 'none';
+            document.querySelector('.video-toggle').textContent = 'Show';
+        }
+    }
+
+    /** Load video from a YouTube URL */
+    function loadVideo(youtubeUrl) {
+        if (!youtubeUrl) {
+            video.src = '';
+            videoContainer.style.display = 'none';
+            currentVideoUrl = null;
+            return;
+        }
+        // Don't re-fetch if it's the same URL
+        if (youtubeUrl === currentVideoUrl) return;
+        currentVideoUrl = youtubeUrl;
+
+        fetch('/direct-video?url=' + encodeURIComponent(youtubeUrl))
+            .then(r => r.json())
+            .then(d => {
+                if (d.video_url) {
+                    video.src = d.video_url;
+                    videoContainer.style.display = '';
+                    video.load();
+                    video.play().catch(() => {});
+                } else {
+                    videoContainer.style.display = 'none';
+                }
+            })
+            .catch(() => {
+                videoContainer.style.display = 'none';
+            });
+    }
+
+    /** Load a new track — stops current, switches source, plays */
+    async function loadTrack(np) {
+        // Stop current audio cleanly
+        audio.pause();
+        audio.removeAttribute('src');
+        audio.load();
+
+        if (np.stream_url) {
+            audio.src = np.stream_url;
+            try {
+                await audio.play();
+                currentPlayingId = np.id;
+                setStatus('green', 'Playing');
+            } catch (e) {
+                setStatus('yellow', 'Click to play');
+            }
+            if (np.video_id) {
+                loadVideo(np.url);
+            } else {
+                loadVideo(null);
+            }
+        } else {
+            currentPlayingId = null;
+            setStatus('gray', 'Waiting');
+            loadVideo(null);
+        }
+
+        // Update skip button visibility
+        if (skipBtn) {
+            skipBtn.classList.toggle('hidden', np.id === -1 || np.id === null);
+        }
+    }
+
     /** Poll now-playing and react to changes */
     async function pollNowPlaying() {
         try {
@@ -315,23 +430,13 @@
             const np = await resp.json();
             updateNowUi(np.title, np.username);
 
-            // Track count
             const qc = document.getElementById('queueCount');
             if (qc) qc.textContent = (np.queue_count || 0) + ' in queue';
 
-            // If now-playing changed and we're not playing the right thing, switch
-            if (np.id !== null && np.id !== undefined && np.stream_url) {
+            // If now-playing changed, switch track
+            if (np.id !== null && np.id !== undefined) {
                 if (currentPlayingId !== np.id) {
-                    // Something new to play
-                    if (np.stream_url) {
-                        audio.src = np.stream_url;
-                        audio.play().catch(e => {
-                            console.log('Playback requires user interaction');
-                            setStatus('yellow', 'Click to play');
-                        });
-                        currentPlayingId = np.id;
-                        setStatus('green', 'Playing');
-                    }
+                    await loadTrack(np);
                 }
             }
         } catch (e) {
@@ -347,16 +452,7 @@
             const resp = await fetch('/advance', { method: 'POST' });
             const np = await resp.json();
             updateNowUi(np.title, np.username);
-
-            if (np.stream_url) {
-                audio.src = np.stream_url;
-                audio.play().catch(() => setStatus('yellow', 'Click to play'));
-                currentPlayingId = np.id;
-                setStatus('green', 'Playing');
-            } else {
-                currentPlayingId = null;
-                setStatus('gray', 'Waiting');
-            }
+            await loadTrack(np);
         } catch (e) {
             setStatus('gray', 'Error advancing');
         }
@@ -377,28 +473,36 @@
     });
 
     async function skipTrack() {
+        if (skipInProgress) return;
+        skipInProgress = true;
         skipBtn.disabled = true;
         skipBtn.textContent = '...';
+
         try {
+            // Stop current audio first
+            audio.pause();
+            audio.removeAttribute('src');
+            audio.load();
+
             const resp = await fetch('/skip');
             const np = await resp.json();
             updateNowUi(np.title, np.username);
-            if (np.stream_url) {
-                audio.src = np.stream_url;
-                audio.play().catch(() => {});
-                currentPlayingId = np.id;
-                setStatus('green', 'Playing');
-            }
-        } catch (e) {}
+            await loadTrack(np);
+        } catch (e) {
+            console.error('Skip failed', e);
+            setStatus('gray', 'Skip failed');
+        }
+
         skipBtn.disabled = false;
         skipBtn.textContent = 'Skip';
+        skipInProgress = false;
     }
 
-    // Initial load: engage the now-playing
+    // Initial load
     pollNowPlaying();
 
-    // Poll every 5 seconds for changes
-    setInterval(pollNowPlaying, 5000);
+    // Poll every 4 seconds for changes
+    setInterval(pollNowPlaying, 4000);
     {% endif %}
 
     // ─── Love Toggle ───
