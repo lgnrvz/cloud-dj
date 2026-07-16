@@ -1,66 +1,107 @@
 # Cloud DJ
 
-A self-hosted music queue system where **music plays in the browser**, not on the server. Anyone can add songs, but playback happens on the admin's machine through their web browser.
+A self-hosted music queue system where **music plays in the browser**, not on the server. Anyone can add songs via YouTube links, but playback happens on the admin's machine through their web browser with video.
+
+Perfect for parties, events, or shared spaces — run it on a Raspberry Pi and let guests queue songs from their phones while the admin's laptop/TV plays the video and audio.
 
 ## How It Works
 
 ```
-User ──add YouTube link──> Web App ──queue──> yt-dlp stream ──> Admin's Browser
+Guest ──paste YouTube link──> Web App ──queue──> yt-dlp stream ──> Admin's Browser (video + audio)
 ```
 
-- **Users** paste YouTube links on the website → songs go to a queue
-- **Admin's browser** is the player — audio streams from the server via yt-dlp directly to the browser's `<audio>` element
-- **Auto-DJ** plays upbeat mixes when the queue is empty (streamed to browser)
-- No audio plays through the server's speakers — perfect for headless setups
+- **Anyone** can paste YouTube links on the website → songs go to a queue
+- **Admin's browser** is the player — video + audio streams directly to the browser
+- **Auto-DJ** shuffles through previously played songs when the queue is empty
+- No audio plays through the Raspberry Pi's speakers
 
-## Architecture
+## Features
 
-Unlike traditional setups where the server plays audio locally (yt-dlp → ffmpeg → speaker), Cloud DJ:
+### For Everyone
+- **Paste to add** — Ctrl+V any YouTube link anywhere on the page to queue instantly
+- **♥ Love songs** — Save favorites to a personal list
+- **Auto-DJ** — Plays random songs from history when the queue runs out
+- **10-min limit** — Songs over 10 minutes are blocked
+- **Sign up** — Create your own account to track loved songs
 
-1. **Server** manages the queue, user auth, and streams audio on demand
-2. **Admin's browser** fetches audio via `/stream/<id>` and plays it natively
-3. When a track ends, the browser calls `/advance` to move to the next song
-4. Auto-DJ streams from `/stream/auto-dj` when the queue is empty
+### For Admins
+- **Browser player** — Video + audio plays in the admin's browser tab
+- **Skip** — Skip current track, automatically plays the next in queue
+- **Queue list** — See all pending songs, who added them
+- **History with request counter** — See how many times each song was played
+- **Clear history** — Wipe the played songs list in one click
+- **Delete history entries** — Remove individual songs from history
+- **Manage loved songs** — Remove songs from your loved list
+- **User list** — See all registered users
 
-### Key Endpoints
+### Auto-DJ
+When the queue runs out, Auto-DJ automatically shuffles through previously played songs. When someone adds a new song, it transitions into the queue immediately.
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/` | GET | Redirects to queue |
-| `/queue` | GET | Main queue page with browser player |
-| `/admin` | GET | Admin panel (drag reorder, remove) |
-| `/login` | GET/POST | User login |
-| `/signup` | GET/POST | User registration |
-| `/logout` | GET | Logout |
-| `/add` | POST | Add song to queue |
-| `/love/<id>` | POST | Toggle love on queue item |
-| `/loved/add/<id>` | POST | Add loved song to queue |
-| `/now-playing` | GET | Currently playing song (JSON) |
-| `/advance` | POST | Advance to next track (browser calls) |
-| `/skip` | GET | Skip current track |
-| `/stream/<id>` | GET | Audio stream for a queue item |
-| `/stream/auto-dj` | GET | Auto-DJ audio stream |
-| `/admin/remove/<id>` | POST | Remove queue item (admin) |
-| `/admin/reorder` | POST | Save queue order (admin) |
+## Requirements
 
-## Quick Start
+- **Raspberry Pi** (any model — Pi 3 or 4 recommended)
+- **Python 3.8+**
+- **Node.js** (required by yt-dlp for YouTube extraction)
+- **yt-dlp** (latest from GitHub)
+
+## Installation
+
+### 1. Install system dependencies
 
 ```bash
-# Install dependencies
-sudo apt install -y python3 python3-pip python3-venv
-pip3 install flask flask-login
-
-# Install yt-dlp (latest)
-sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp
-sudo chmod a+rx /usr/local/bin/yt-dlp
-
-# Clone and run
-git clone https://github.com/lgnrvz/cloud-dj.git
-cd cloud-dj
-python3 app.py
+sudo apt update
+sudo apt install -y python3 python3-pip python3-venv nodejs npm curl
 ```
 
-Open `http://<your-ip>:5050` in a browser.
+### 2. Install yt-dlp
+
+```bash
+sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp
+sudo chmod a+rx /usr/local/bin/yt-dlp
+```
+
+### 3. Clone the repo and set up
+
+```bash
+git clone https://github.com/lgnrvz/cloud-dj.git
+cd cloud-dj
+python3 -m venv venv
+source venv/bin/activate
+pip install flask flask-login
+```
+
+### 4. Configure Node.js path (if needed)
+
+yt-dlp needs a JavaScript runtime. Check your Node.js location:
+
+```bash
+which node
+# Usually /usr/bin/node or /usr/local/bin/node
+```
+
+If your Node.js is in a different location, edit the `NODE_PATH` variable in `app.py`:
+
+```python
+NODE_PATH = '/usr/bin/node'  # Change to match your system
+```
+
+### 5. Start the server
+
+```bash
+cd cloud-dj
+source venv/bin/activate
+python app.py
+```
+
+The server runs on **port 5050**.
+
+### 6. Access the web app
+
+| Network | URL |
+|---------|-----|
+| Same machine | http://localhost:5050 |
+| Local network | http://<raspberry-pi-ip>:5050 |
+| Tailscale (remote) | http://<tailscale-ip>:5050 |
 
 ### Default Admin Login
 
@@ -68,45 +109,107 @@ Open `http://<your-ip>:5050` in a browser.
 |------|----------|
 | `admin` | `djadmin123` |
 
-## Features
+**Change the password after first login!**
 
-### For Everyone
-- **Paste to add** — Ctrl+V any YouTube link anywhere on the page to queue a song
-- **♥ Love songs** — Save favorites to a personal list for easy re-queuing
-- **Now Playing** — See what's currently playing with live updates
-- **10-min limit** — Songs over 10 minutes are blocked
+## Tailscale Remote Access (Recommended)
 
-### For Admins
-- **Browser-based player** — Audio plays through your browser, not the server
-- **Skip** — Skip to the next track
-- **Drag to reorder** — Rearrange the queue by dragging items
-- **Remove** — Delete unwanted songs from the queue
-- **User list** — See all registered users
-- **Queue history** — View recently played songs
+If your Raspberry Pi is behind NAT (home network), use [Tailscale](https://tailscale.com) for secure remote access:
 
-### Auto-DJ
-When the queue runs out, Auto-DJ automatically plays upbeat party mixes streamed to the admin's browser. When someone adds a new song, the browser transitions to the queue.
+```bash
+curl -fsSL https://tailscale.com/install.sh | sh
+sudo tailscale up
+```
 
-## Requirements
+Then access Cloud DJ at `http://<tailscale-ip>:5050` from anywhere.
 
-- **Python 3.8+**
-- **Flask + Flask-Login**
-- **yt-dlp** (latest from GitHub recommended)
-- **Node.js** — Required by yt-dlp for YouTube extraction (configure path in `app.py`)
+## Run as a Service (systemd)
+
+To keep Cloud DJ running after you close the terminal:
+
+```bash
+sudo nano /etc/systemd/system/cloud-dj.service
+```
+
+Paste:
+
+```
+[Unit]
+Description=Cloud DJ
+After=network.target
+
+[Service]
+User=pi
+WorkingDirectory=/home/pi/cloud-dj
+ExecStart=/home/pi/cloud-dj/venv/bin/python /home/pi/cloud-dj/app.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Then enable and start:
+
+```bash
+sudo systemctl enable cloud-dj
+sudo systemctl start cloud-dj
+```
+
+## API Endpoints
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/` | GET | — | Redirects to queue |
+| `/queue` | GET | Login | Main queue page with player |
+| `/admin` | GET | Admin | Admin panel (history, users) |
+| `/login` | GET/POST | — | User login |
+| `/signup` | GET/POST | — | User registration |
+| `/logout` | GET | Login | Logout |
+| `/add` | POST | Login | Add song to queue |
+| `/now-playing` | GET | — | Currently playing song (JSON) |
+| `/advance` | POST | Login | Advance to next track |
+| `/skip` | GET | Admin | Skip current track |
+| `/direct-video` | GET | — | Get direct video stream URL |
+| `/love/<id>` | POST | Login | Toggle love on queue item |
+| `/loved/add/<id>` | POST | Login | Add loved song to queue |
+| `/loved/remove/<id>` | POST | Login | Delete loved song |
+| `/admin/remove/<id>` | POST | Admin | Remove queue item |
+| `/admin/clear-history` | POST | Admin | Delete all played history |
+| `/admin/reorder` | POST | Admin | Reorder queue (deprecated) |
 
 ## Project Structure
 
 ```
 cloud-dj/
 ├── app.py                 # Flask application
+├── requirements.txt       # Python dependencies
 ├── templates/
 │   ├── base.html          # Base layout
 │   ├── queue.html         # Main queue page with browser player
-│   ├── admin.html         # Admin panel
+│   ├── admin.html         # Admin panel (history, users)
 │   ├── login.html         # Login page
 │   └── signup.html        # Registration page
 ├── .gitignore
 └── README.md
+```
+
+## Troubleshooting
+
+| Problem | Fix |
+|---------|-----|
+| yt-dlp fails: "JS runtime not found" | Install Node.js and set `NODE_PATH` in app.py |
+| Video won't play in browser | Check `/direct-video` endpoint — yt-dlp may need updating |
+| "Click play" message | Click the video player once — subsequent tracks auto-play |
+| Queue items stuck as "playing" | Server auto-cleans stale entries on next track advance |
+| Port 5050 already in use | Change port in `app.py`: `app.run(host='0.0.0.0', port=5050)` |
+
+## Updating
+
+```bash
+cd cloud-dj
+git pull
+source venv/bin/activate
+pip install -r requirements.txt
+# Restart the server
 ```
 
 ## License
