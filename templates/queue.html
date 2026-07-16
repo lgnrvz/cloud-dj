@@ -437,6 +437,7 @@
             const np = await resp.json();
             updateNowUi(np.title, np.username);
             await loadTrack(np);
+            refreshQueueList();
         } catch (e) {
             setStatus('#444', 'Error advancing');
         }
@@ -455,6 +456,7 @@
                 const np = await resp.json();
                 updateNowUi(np.title, np.username);
                 await loadTrack(np);
+                refreshQueueList();
             } catch (e) {
                 setStatus('#444', 'Error advancing');
             }
@@ -472,6 +474,7 @@
             const np = await resp.json();
             updateNowUi(np.title, np.username);
             await loadTrack(np);
+            refreshQueueList();
         } catch (e) {
             setStatus('#444', 'Skip failed');
         }
