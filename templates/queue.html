@@ -311,7 +311,7 @@
             <!-- Quick Add Card -->
             <div class="card paste-card">
                 <div style="display:flex;align-items:center;gap:8px;">
-                    <div onclick="quickPasteIcon()" style="cursor:pointer;flex-shrink:0;display:flex;align-items:center;padding:4px;border-radius:4px;transition:.15s;" onmouseover="this.style.background='#1a1a2a'" onmouseout="this.style.background=''">
+                    <div onclick="document.getElementById('pasteInput').focus()" style="cursor:pointer;flex-shrink:0;display:flex;align-items:center;padding:4px;border-radius:4px;transition:.15s;" onmouseover="this.style.background='#1a1a2a'" onmouseout="this.style.background=''">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                             <rect x="8" y="2" width="8" height="4" rx="1"/>
                             <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
@@ -601,15 +601,6 @@
     document.getElementById('pasteInput').addEventListener('keydown', function(e) {
         if (e.key === 'Enter') submitPaste();
     });
-
-    /** Quick paste icon — prompts for URL (works everywhere, no HTTPS needed) */
-    function quickPasteIcon() {
-        const url = prompt('Paste YouTube link:');
-        if (url && url.trim()) {
-            document.getElementById('pasteInput').value = url.trim();
-            submitPaste();
-        }
-    }
 
     /** Re-fetch the loved songs card HTML and swap it in */
     async function refreshLovedSongs() {
