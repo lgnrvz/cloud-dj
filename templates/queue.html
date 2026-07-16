@@ -563,7 +563,7 @@
         const input = document.getElementById('pasteInput');
         const text = input.value.trim();
         if (!text) { showToast('Paste a YouTube link first', 'warn'); return; }
-        const ytMatch = text.match(/(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/);
+        const ytMatch = text.match(/(https?:\/\/)?(www\.|m\.)?(youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/);
         if (!ytMatch) { showToast('Not a valid YouTube link', 'warn'); return; }
         showToast('Adding song...', 'warn');
         const formData = new FormData();
