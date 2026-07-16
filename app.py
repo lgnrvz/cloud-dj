@@ -249,6 +249,8 @@ def add():
     raw_url = request.form['url'].strip()
     clean_url = clean_yt_url(raw_url)
     if not clean_url:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'error': 'Invalid YouTube link'}), 400
         flash('Invalid YouTube link!', 'danger')
         return redirect(url_for('queue'))
 
@@ -259,9 +261,13 @@ def add():
         if dur and dur.isdigit():
             d = int(dur)
             if d > 600:
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jsonify({'error': f'Too long! Max 10 min'}), 400
                 flash(f'Too long! Max 10 min (this is {d//60}m{d%60}s).', 'danger')
                 return redirect(url_for('queue'))
     except subprocess.TimeoutExpired:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'error': 'Could not verify duration'}), 400
         flash('Could not verify duration - try again.', 'danger')
         return redirect(url_for('queue'))
     except:
@@ -274,6 +280,8 @@ def add():
     ).fetchone()
     if existing:
         conn.close()
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'error': 'Already added'}), 409
         flash('You already added this song!', 'warn')
         return redirect(url_for('queue'))
 
@@ -292,6 +300,9 @@ def add():
     # If Auto-DJ is playing, kick the browser to advance
     if NOW_PLAYING.get('id') == -1:
         auto_advance()
+
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({'success': True, 'id': item_id})
 
     flash('Song added to queue!', 'success')
     return redirect(url_for('queue'))
