@@ -218,11 +218,17 @@ def _auto_start():
         conn.close()
 
 def _enrich_now(np):
-    """Add video_id and other computed fields to a now-playing dict."""
+    """Add video_id and queue_count to a now-playing dict."""
     if np.get('url'):
         m = re.search(r'(?:v=|/)([\w-]{11})(?:\?|&|$)', np['url'])
         if m:
             np['video_id'] = m.group(1)
+    # Add queue count if not present
+    if 'queue_count' not in np:
+        conn = get_db()
+        c = conn.execute("SELECT COUNT(*) as cnt FROM queue WHERE status='pending'").fetchone()
+        np['queue_count'] = c['cnt'] if c else 0
+        conn.close()
     return np
 
 @app.route('/now-playing')
@@ -230,14 +236,7 @@ def now_playing():
     # Auto-start if nothing playing but pending items exist
     if NOW_PLAYING.get('id') is None:
         _auto_start()
-    np = _enrich_now(dict(NOW_PLAYING))
-    conn = get_db()
-    items = conn.execute(
-        "SELECT COUNT(*) as c FROM queue WHERE status='pending'"
-    ).fetchone()
-    conn.close()
-    np['queue_count'] = items['c'] if items else 0
-    return jsonify(np)
+    return jsonify(_enrich_now(dict(NOW_PLAYING)))
 
 @app.route('/add', methods=['POST'])
 @login_required
@@ -466,7 +465,7 @@ def advance():
         conn.commit()
         conn.close()
 
-    return jsonify(dict(NOW_PLAYING))
+    return jsonify(_enrich_now(dict(NOW_PLAYING)))
 
 @app.route('/skip')
 @login_required
@@ -496,7 +495,7 @@ def skip():
         conn.commit()
         conn.close()
 
-    return jsonify(dict(NOW_PLAYING))
+    return jsonify(_enrich_now(dict(NOW_PLAYING)))
 
 # ─── ADMIN ───
 
