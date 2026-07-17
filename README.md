@@ -1,4 +1,4 @@
-# Cloud DJ
+# Cloud-DJ
 
 A self-hosted music queue system where **music plays in the browser** of whoever is logged in as admin. Anyone on your local network can paste YouTube links to add songs, request favorites from their loved list, and watch the queue advance automatically.
 

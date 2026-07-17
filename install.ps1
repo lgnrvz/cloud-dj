@@ -1,10 +1,10 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-    Cloud DJ — Desktop Installer for Windows
+    Cloud-DJ — Desktop Installer for Windows
     Turns any Windows machine into a LAN music server.
 .DESCRIPTION
-    Installs Cloud DJ on your Windows PC:
+    Installs Cloud-DJ on your Windows PC:
     - Python virtual environment with all dependencies
     - Windows Firewall rule for port 5050
     - Scheduled Task for auto-start on boot
@@ -14,7 +14,7 @@
     Or right-click → "Run with PowerShell"
 #>
 
-$Host.UI.RawUI.WindowTitle = "Cloud DJ Installer"
+$Host.UI.RawUI.WindowTitle = "Cloud-DJ Installer"
 $Port = if ($env:PORT) { $env:PORT } else { 5050 }
 $InstallDir = "$env:USERPROFILE\cloud-dj"
 $RepoUrl = "https://github.com/lgnrvz/cloud-dj.git"
@@ -197,7 +197,7 @@ if (Test-Path "$InstallDir") {
         Write-Ok "Repository cloned"
     }
 } else {
-    Write-Info "Cloning Cloud DJ to $InstallDir..."
+    Write-Info "Cloning Cloud-DJ to $InstallDir..."
     git clone $RepoUrl "$InstallDir" 2>&1 | Out-Null
     Write-Ok "Repository cloned"
 }
@@ -240,16 +240,16 @@ Write-Ok "app.py paths are auto-detected (no manual config needed)"
 
 # ── Step 9: Open Windows Firewall ──────────────────────────
 Write-Info "Opening port $Port in Windows Firewall..."
-$rule = Get-NetFirewallRule -DisplayName "Cloud DJ (TCP $Port)" -ErrorAction SilentlyContinue
+$rule = Get-NetFirewallRule -DisplayName "Cloud-DJ (TCP $Port)" -ErrorAction SilentlyContinue
 if (-not $rule) {
     try {
-        New-NetFirewallRule -DisplayName "Cloud DJ (TCP $Port)" `
+        New-NetFirewallRule -DisplayName "Cloud-DJ (TCP $Port)" `
             -Direction Inbound -LocalPort $Port -Protocol TCP -Action Allow `
             -Profile Private,Domain -ErrorAction Stop | Out-Null
         Write-Ok "Firewall rule created for port $Port"
     } catch {
         Write-Warn "Could not create firewall rule. Run this as Administrator or add manually:"
-        Write-Host "  netsh advfirewall firewall add rule name=`"Cloud DJ`" dir=in action=allow protocol=TCP localport=$Port" -ForegroundColor Yellow
+        Write-Host "  netsh advfirewall firewall add rule name=`"Cloud-DJ`" dir=in action=allow protocol=TCP localport=$Port" -ForegroundColor Yellow
     }
 } else {
     Write-Ok "Firewall rule already exists"
@@ -297,7 +297,7 @@ try {
     $listener.Close()
 } catch { }
 if (-not $portInUse) {
-    Write-Info "Starting Cloud DJ server..."
+    Write-Info "Starting Cloud-DJ server..."
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = (Resolve-Path ".venv\Scripts\python.exe").Path
     $psi.Arguments = "app.py"
@@ -342,9 +342,9 @@ $splat = @{
 }
 Write-Host @"
 
-╔══════════════════════════════════════════════════════════╗
-║              INSTALLATION COMPLETE!                      ║
-╚══════════════════════════════════════════════════════════╝
+========================================================
+             INSTALLATION COMPLETE!
+========================================================
 
 "@ -ForegroundColor Green
 $splat.Object | Format-Table -HideTableHeaders -AutoSize -Wrap

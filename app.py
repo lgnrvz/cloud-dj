@@ -150,7 +150,7 @@ def set_now_playing(item):
                 'id': -1,
                 'url': played['clean_url'] or played['youtube_url'],
                 'title': 'Auto-DJ: ' + (played['title'] or 'Unknown'),
-                'username': 'Cloud DJ',
+                'username': 'Cloud-DJ',
                 'is_auto_dj': True
             }
         else:

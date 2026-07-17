@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ╔══════════════════════════════════════════════════════════╗
-# ║              Cloud DJ — Desktop Installer               ║
-# ║  Turns any Linux machine into a LAN music server        ║
-# ╚══════════════════════════════════════════════════════════╝
+# =========================================================
+#           Cloud-DJ — Desktop Installer
+#  Turns any Linux machine into a LAN music server
+# =========================================================
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -29,9 +29,7 @@ echo -e "${CYAN}  ___ _                 _   ${GREEN}  ___ ___  ${NC}"
 echo -e "${CYAN} / __| |_   __ _ _ _  __| | ${GREEN} / __/ _ \ ${NC}"
 echo -e "${CYAN}| (__| ' \ / _\` | ' \/ _\` | ${GREEN}| (_| (_) |${NC}"
 echo -e "${CYAN} \___|_||_|\__,_|_||_\__,_| ${GREEN} \___\__\_\ ${NC}"
-echo -e "${CYAN}                            ${GREEN}            ${NC}"
 echo -e "${YELLOW}  LAN Music Server Installer${NC}"
-echo ""
 
 # ── Step 1: Check OS ────────────────────────────────────────
 if [ "$(uname)" != "Linux" ]; then
@@ -137,7 +135,7 @@ if [ -d "$INSTALL_DIR" ]; then
         warn "$INSTALL_DIR exists but isn't a git repo. Using as-is."
     fi
 else
-    info "Cloning Cloud DJ to $INSTALL_DIR..."
+    info "Cloning Cloud-DJ to $INSTALL_DIR..."
     git clone "$REPO" "$INSTALL_DIR"
     cd "$INSTALL_DIR"
     ok "Repository cloned"
@@ -200,7 +198,7 @@ SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 
 cat > /tmp/cloud-dj.service << SERVICEEOF
 [Unit]
-Description=Cloud DJ — LAN Music Server
+Description=Cloud-DJ — LAN Music Server
 After=network.target network-online.target
 Wants=network-online.target
 
@@ -267,9 +265,9 @@ fi
 
 # ── Done ─────────────────────────────────────────────────────
 echo ""
-echo -e "${GREEN}╔══════════════════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║                   INSTALLATION COMPLETE!                ║${NC}"
-echo -e "${GREEN}╚══════════════════════════════════════════════════════════╝${NC}"
+echo -e "${GREEN}========================================================${NC}"
+echo -e "${GREEN}             INSTALLATION COMPLETE!${NC}"
+echo -e "${GREEN}========================================================${NC}"
 echo ""
 echo -e "  ${CYAN}Local access:${NC}    http://localhost:$PORT"
 echo -e "  ${CYAN}LAN access:${NC}      http://${LAN_IP}:$PORT"
