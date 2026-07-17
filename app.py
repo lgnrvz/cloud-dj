@@ -376,8 +376,8 @@ def add():
     # Fetch title in background
     threading.Thread(target=fetch_title, args=(item_id, clean_url), daemon=True).start()
 
-    # If Auto-DJ is playing, kick the browser to advance
-    if NOW_PLAYING.get('id') == -1:
+    # If nothing is playing or Auto-DJ, kick the browser to advance
+    if NOW_PLAYING.get('id') is None or NOW_PLAYING.get('id') == -1:
         auto_advance()
 
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -424,7 +424,7 @@ def add_from_loved(loved_id):
     conn.commit()
     conn.close()
 
-    if NOW_PLAYING.get('id') == -1:
+    if NOW_PLAYING.get('id') is None or NOW_PLAYING.get('id') == -1:
         auto_advance()
 
     return jsonify({'success': True, 'title': song['title']})
