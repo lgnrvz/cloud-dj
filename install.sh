@@ -250,9 +250,15 @@ fi
 
 # ── Step 9: Get LAN IP ───────────────────────────────────────
 info "Detecting LAN address..."
-LAN_IP=$(ip -4 addr show | grep -oP '(?<=inet )192\.168\.\d+\.\d+' | head -1)
+LAN_IP=$(ip -4 addr show 2>/dev/null | grep -oP '(?<=inet )192\.168\.\d+\.\d+' | head -1)
+if [ -z "$LAN_IP" ]; then
+    LAN_IP=$(ip -4 addr show 2>/dev/null | grep -oP '(?<=inet )(10\.\d+\.\d+\.\d+|172\.1[6-9]\.\d+\.\d+|172\.2[0-9]\.\d+\.\d+|172\.3[0-1]\.\d+\.\d+)' | head -1)
+fi
 if [ -z "$LAN_IP" ]; then
     LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+fi
+if [ -z "$LAN_IP" ]; then
+    LAN_IP="localhost"
 fi
 
 # ── Step 10: Wait for service and verify ────────────────────
