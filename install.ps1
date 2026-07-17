@@ -73,22 +73,33 @@ function Install-Direct {
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
         # Download with progress bar
         Invoke-WebRequest -Uri $Url -OutFile $installer -UseBasicParsing
-        Write-Ok "Downloaded $Name ($([math]::Round((Get-Item $installer).Length / 1MB, 1)) MB)"
+        $fileSize = (Get-Item $installer).Length
+        if ($fileSize -lt 1MB) {
+            throw "Downloaded file is too small ($([math]::Round($fileSize/1KB,0)) KB) — probably an error page"
+        }
+        Write-Ok "Downloaded $Name ($([math]::Round($fileSize / 1MB, 1)) MB)"
     } catch {
         Write-Warn "Direct download failed: $_"
         # Try via curl.exe if Invoke-WebRequest failed (common on locked-down Windows)
         if (Get-Command curl -ErrorAction SilentlyContinue) {
             Write-Info "Retrying with curl.exe..."
             curl.exe -L -o "$installer" "$Url" 2>&1 | Out-Null
-            if ($LASTEXITCODE -eq 0 -and (Test-Path $installer) -and (Get-Item $installer).Length -gt 1MB) {
-                Write-Ok "Downloaded $Name via curl"
+            if ($LASTEXITCODE -eq 0 -and (Test-Path $installer)) {
+                $fileSize = (Get-Item $installer).Length
+                if ($fileSize -gt 1MB) {
+                    Write-Ok "Downloaded $Name via curl ($([math]::Round($fileSize/1MB,1)) MB)"
+                } else {
+                    Write-Warn "curl download too small ($([math]::Round($fileSize/1KB,0)) KB) — likely an error page"
+                    Write-Warn "Please install $Name manually: $(Split-Path $Url -Parent)"
+                    return $false
+                }
             } else {
                 Write-Warn "curl download also failed."
-                Write-Warn "Please install $Name manually from: $(Split-Path $Url -Parent)"
+                Write-Warn "Please install $Name manually: $(Split-Path $Url -Parent)"
                 return $false
             }
         } else {
-            Write-Warn "Please install $Name manually from: $(Split-Path $Url -Parent)"
+            Write-Warn "Please install $Name manually: $(Split-Path $Url -Parent)"
             return $false
         }
     }
@@ -162,7 +173,7 @@ $git = Test-RealCommand "git"
 if (-not $git) {
     Write-Warn "Git not found — will install it"
     $installed = Install-Direct -Name "Git" `
-        -Url "https://github.com/git-for-windows/git/releases/download/v2.47.0.windows.2/Git-2.47.0-64-bit.exe" `
+        -Url "https://github.com/git-for-windows/git/releases/download/v2.55.0.windows.3/Git-2.55.0.3-64-bit.exe" `
         -InstallerArgs "/VERYSILENT /NORESTART /SUPPRESSMSGBOXES" `
         -ExeName "git" `
         -FallbackPaths @("$env:ProgramFiles\Git\bin\git.exe", "${env:ProgramFiles(x86)}\Git\bin\git.exe")
@@ -185,7 +196,7 @@ if (-not $python) {
     Write-Info "If a UAC prompt appears, click YES."
 
     $installed = Install-Direct -Name "Python" `
-        -Url "https://www.python.org/ftp/python/3.12.8/python-3.12.8-amd64.exe" `
+        -Url "https://www.python.org/ftp/python/3.12.13/python-3.12.13-amd64.exe" `
         -InstallerArgs "/quiet InstallAllUsers=1 PrependPath=1 Include_test=0" `
         -ExeName "python" `
         -FallbackPaths @(
