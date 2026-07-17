@@ -559,6 +559,13 @@
                 video.removeAttribute('src');
                 video.load();
                 setStatus('#ffd700', 'Stream unavailable');
+                // Auto-advance past unavailable streams
+                try {
+                    const resp = await fetch('/advance', { method: 'POST' });
+                    const adel = await resp.json();
+                    updateNowUi(adel.title, adel.username);
+                    await loadTrack(adel);
+                } catch(e) {}
             }
         } catch (e) {
             videoLoading.classList.remove('show');
