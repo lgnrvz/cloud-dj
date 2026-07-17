@@ -356,6 +356,7 @@
                 <span class="dot" id="playerStatusDot" style="background:#1db954;"></span>
                 <span class="status-text" id="playerStatusText">Connected</span>
                 <span class="queue-count" id="queueCount">{{ items|length }} in queue</span>
+                <button id="videoToggle" onclick="toggleVideo()" style="margin-left:auto;background:none;border:1px solid #2a2a3a;border-radius:4px;color:#888;cursor:pointer;font-size:0.6rem;padding:2px 8px;font-family:inherit;transition:.15s;" onmouseover="this.style.color='#1db954';this.style.borderColor='#1db95444'" onmouseout="this.style.color='#888';this.style.borderColor='#2a2a3a'">Hide</button>
             </div>
 
             <!-- Video Player -->
@@ -795,6 +796,19 @@
     // Start polling
     pollNowPlaying();
     setInterval(pollNowPlaying, 4000);
+
+    /** Toggle video player visibility */
+    function toggleVideo() {
+        const container = document.getElementById('videoContainer');
+        const btn = document.getElementById('videoToggle');
+        if (container.style.display === 'none') {
+            container.style.display = '';
+            btn.textContent = 'Hide';
+        } else {
+            container.style.display = 'none';
+            btn.textContent = 'Show';
+        }
+    }
     {% endif %}
 
     // Loved songs pagination state (must be before refreshLovedSongs call)
