@@ -162,32 +162,24 @@
                 <div class="card">
                     <h2>History</h2>
                     <div style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
-                        <span style="color:#444;font-size:0.7rem;">{{ history|length }} played</span>
-                        {% if history|length > 0 %}
-                        <button class="clr-btn" onclick="clearHistory()">Clear All</button>
-                        {% endif %}
-                    </div>
-                    {% if history|length == 0 %}
-                        <div class="empty">No played songs yet</div>
-                    {% else %}
-                        {% for item in history %}
-                        <div class="history-item">
-                            <div class="info">
-                                <div class="title">{{ item.title or 'Unknown' }}</div>
-                                <div class="sub">
-                                    <span>{{ item.username }}</span>
-                                    <span>{{ item.created_at }}</span>
-                                </div>
-                            </div>
-                            <div style="display:flex;align-items:center;gap:3px;">
-                                <span class="req-badge">{{ item.request_count }}x</span>
-                                <button class="love-btn-sm {% if item.loved and item.user_id == current_user.id %}loved{% endif %}" onclick="adminLove({{ item.id }}, this)" title="Love">&#9825;</button>
-                                <a href="{{ item.clean_url or item.youtube_url }}" target="_blank" class="view-btn" style="font-size:0.6rem;padding:3px 6px;">View</a>
-                                <button class="del-btn" onclick="deleteHistoryItem({{ item.id }})" title="Delete">&#x2715;</button>
-                            </div>
+                        <span style="color:#444;font-size:0.7rem;" id="histTotal">0 played</span>
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <select id="perPageSelect" onchange="loadHistory(1)" style="background:#1a1a2a;color:#888;border:1px solid #2a2a3a;border-radius:4px;padding:3px 6px;font-size:0.7rem;font-family:inherit;outline:none;">
+                                <option value="10">10</option>
+                                <option value="20" selected>20</option>
+                                <option value="50">50</option>
+                            </select>
+                            <button class="clr-btn" onclick="clearHistory()">Clear All</button>
                         </div>
-                        {% endfor %}
-                    {% endif %}
+                    </div>
+                    <div id="histList">
+                        <div class="empty">Loading...</div>
+                    </div>
+                    <div id="histPages" style="display:flex;justify-content:center;align-items:center;gap:8px;padding:10px 0 4px 0;font-size:0.7rem;">
+                        <button id="histPrev" onclick="loadHistory(curPage-1)" style="background:none;border:none;color:#555;cursor:pointer;font-family:inherit;font-size:0.7rem;">&larr; Prev</button>
+                        <span id="histPageInfo" style="color:#444;">Page 1 / 1</span>
+                        <button id="histNext" onclick="loadHistory(curPage+1)" style="background:none;border:none;color:#555;cursor:pointer;font-family:inherit;font-size:0.7rem;">Next &rarr;</button>
+                    </div>
                 </div>
             </div>
 
@@ -232,12 +224,59 @@
     // Live now-playing updates
     const npTrack = document.getElementById('npTrack');
     const npMeta = document.getElementById('npMeta');
+    let curPage = 1;
+    const currentUserId = {{ current_user.id }};
+
     setInterval(function(){
         fetch('/now-playing').then(r=>r.json()).then(d => {
             npTrack.textContent = d.title;
             npMeta.textContent = d.username;
         }).catch(() => {});
     }, 5000);
+
+    // Load paginated history
+    function loadHistory(page) {
+        const perPage = document.getElementById('perPageSelect').value;
+        curPage = page;
+        fetch('/admin/history?page=' + page + '&per_page=' + perPage)
+            .then(r => r.json())
+            .then(d => {
+                document.getElementById('histTotal').textContent = d.total + ' played';
+                document.getElementById('histPageInfo').textContent = 'Page ' + d.page + ' / ' + d.pages;
+                document.getElementById('histPrev').style.color = d.page > 1 ? '#888' : '#333';
+                document.getElementById('histPrev').disabled = d.page <= 1;
+                document.getElementById('histNext').style.color = d.page < d.pages ? '#888' : '#333';
+                document.getElementById('histNext').disabled = d.page >= d.pages;
+                const list = document.getElementById('histList');
+                if (d.items.length === 0) {
+                    list.innerHTML = '<div class="empty">No played songs yet</div>';
+                    return;
+                }
+                list.innerHTML = d.items.map(item =>
+                    '<div class="history-item">'
+                    + '<div class="info">'
+                    + '<div class="title">' + escapeHtml(item.title || 'Unknown') + '</div>'
+                    + '<div class="sub"><span>' + escapeHtml(item.username) + '</span><span>' + (item.created_at || '') + '</span></div>'
+                    + '</div>'
+                    + '<div style="display:flex;align-items:center;gap:3px;">'
+                    + '<span class="req-badge">' + item.request_count + 'x</span>'
+                    + '<button class="love-btn-sm' + (item.loved && item.user_id == currentUserId ? ' loved' : '') + '" onclick="adminLove(' + item.id + ', this)" title="Love">&#9825;</button>'
+                    + '<a href="' + escapeHtml(item.clean_url || item.youtube_url || '') + '" target="_blank" class="view-btn" style="font-size:0.6rem;padding:3px 6px;">View</a>'
+                    + '<button class="del-btn" onclick="deleteHistoryItem(' + item.id + ')" title="Delete">&#x2715;</button>'
+                    + '</div>'
+                    + '</div>'
+                ).join('');
+            }).catch(() => {});
+    }
+
+    function escapeHtml(t) {
+        const d = document.createElement('div');
+        d.textContent = t;
+        return d.innerHTML;
+    }
+
+    // Load initial history
+    loadHistory(1);
 
     // Load scoring setting
     fetch('/admin/settings').then(r=>r.json()).then(d => {

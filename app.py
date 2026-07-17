@@ -578,6 +578,36 @@ def admin():
     conn.close()
     return render_template('admin.html', items=items, history=history, users=users, now=dict(NOW_PLAYING))
 
+@app.route('/admin/history')
+@login_required
+def admin_history():
+    """JSON endpoint for paginated history."""
+    if not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized'}), 403
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    per_page = min(per_page, 50)
+    offset = (page - 1) * per_page
+
+    conn = get_db()
+    total = conn.execute("SELECT COUNT(*) as c FROM queue WHERE status='played'").fetchone()['c']
+    rows = conn.execute("""
+        SELECT q.*,
+            (SELECT COUNT(*) FROM queue WHERE clean_url = q.clean_url) as request_count
+        FROM queue q
+        WHERE q.status='played'
+        ORDER BY q.id DESC LIMIT ? OFFSET ?
+    """, (per_page, offset)).fetchall()
+    conn.close()
+
+    return jsonify({
+        'items': [dict(r) for r in rows],
+        'total': total,
+        'page': page,
+        'per_page': per_page,
+        'pages': (total + per_page - 1) // per_page
+    })
+
 @app.route('/admin/remove/<int:item_id>', methods=['POST'])
 @login_required
 def remove_item(item_id):
