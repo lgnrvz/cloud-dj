@@ -223,4 +223,6 @@ pip install -r requirements.txt
 
 ## License
 
-MIT
+[CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) — Attribution-NonCommercial 4.0 International
+
+You are free to share and adapt the code for non-commercial purposes, with attribution. Commercial use is not permitted.
