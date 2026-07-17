@@ -45,6 +45,14 @@
         .admin-grid { display: grid; grid-template-columns: 4fr 1fr; gap: 16px; align-items: start; }
         .admin-grid .full { grid-column: 1 / -1; }
         @media (max-width: 600px) { .admin-grid { grid-template-columns: 1fr; } }
+        @media (max-width: 768px) {
+            .container { padding: 8px; gap: 8px; width: 100%; max-width: 100%; }
+            .navbar { padding: 10px 14px; flex-wrap: wrap; gap: 6px; }
+            .navbar .brand { font-size: 0.95rem; }
+            .navbar a { font-size: 0.7rem; margin-left: 10px; }
+            .card { border-radius: 6px; }
+            .now-playing-bar { border-radius: 6px; }
+        }
 
         .card {
             background: #0d0d16;
