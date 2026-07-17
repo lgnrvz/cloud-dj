@@ -181,8 +181,8 @@
             100% { transform: scale(1); opacity: 1; }
         }
         #scorePopup .score-num {
-            font-size: 5.5rem; font-weight: 800; color: #ffd700;
-            text-shadow: 0 0 40px #ffd70066, 0 0 80px #ffd70033;
+            font-size: 11rem; font-weight: 800; color: #ffd700;
+            text-shadow: 0 0 60px #ffd70066, 0 0 120px #ffd70033;
             line-height: 1;
         }
         #scorePopup .score-label {
@@ -560,7 +560,7 @@
         // Bomb burst from bottom center — particles EXPLODE UPWARD
         const cx = canvas.width / 2;
         const cy = canvas.height;
-        for (let i = 0; i < 250; i++) {
+        for (let i = 0; i < 500; i++) {
             const angle = -Math.PI/2 + (Math.random() - 0.5) * Math.PI * 0.85;
             const speed = Math.random() * 14 + 6;
             pieces.push({
@@ -577,7 +577,7 @@
             });
         }
         // Rain from top
-        for (let i = 0; i < 150; i++) {
+        for (let i = 0; i < 300; i++) {
             pieces.push({
                 x: Math.random() * canvas.width,
                 y: Math.random() * canvas.height * -1,
@@ -596,10 +596,11 @@
         const audio = new Audio('/static/applause.wav');
         audio.volume = 0.6;
         audio.play().catch(() => {});
-        setTimeout(() => { audio.pause(); audio.currentTime = 0; }, 4500);
+        const stopAudio = () => { audio.pause(); audio.currentTime = 0; };
+        setTimeout(stopAudio, 6000);
 
-        // ── Animation Loop (4.5 seconds, matches applause) ──
-        const FRAMES = 270;
+        // ── Animation Loop (6 seconds) ──
+        const FRAMES = 380;
         let frame = 0;
         function anim() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
