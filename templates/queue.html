@@ -908,9 +908,12 @@
     /** Refresh loved songs list from JSON endpoint with pagination */
     let lovedPage = 1;
     async function refreshLovedSongs() {
+        lovedPage = Math.max(1, lovedPage);
         try {
             const resp = await fetch('/loved-songs?page=' + lovedPage);
             const d = await resp.json();
+            // Clamp page to valid range
+            lovedPage = Math.min(d.pages, Math.max(1, lovedPage));
             const list = document.getElementById('lovedList');
             const count = document.getElementById('lovedCount');
             const pages = document.getElementById('lovedPages');
@@ -930,9 +933,9 @@
                 + '</div>'
             ).join('');
             pages.innerHTML = '<div style="display:flex;justify-content:center;align-items:center;gap:8px;padding:6px 0;font-size:0.7rem;">'
-                + '<button onclick="lovedPage--; refreshLovedSongs();" style="' + (d.page <= 1 ? 'color:#333;' : 'color:#888;') + 'background:none;border:none;cursor:' + (d.page <= 1 ? 'default' : 'pointer') + ';font-family:inherit;font-size:0.7rem;">&larr;</button>'
+                + '<button onclick="lovedPage=' + (d.page - 1) + '; refreshLovedSongs();" style="background:none;border:none;color:' + (d.page <= 1 ? '#333' : '#888') + ';cursor:' + (d.page <= 1 ? 'default' : 'pointer') + ';font-family:inherit;font-size:0.7rem;"' + (d.page <= 1 ? ' disabled' : '') + '>&larr;</button>'
                 + '<span style="color:#444;">' + d.page + '/' + d.pages + '</span>'
-                + '<button onclick="lovedPage++; refreshLovedSongs();" style="' + (d.page >= d.pages ? 'color:#333;' : 'color:#888;') + 'background:none;border:none;cursor:' + (d.page >= d.pages ? 'default' : 'pointer') + ';font-family:inherit;font-size:0.7rem;">&rarr;</button>'
+                + '<button onclick="lovedPage=' + (d.page + 1) + '; refreshLovedSongs();" style="background:none;border:none;color:' + (d.page >= d.pages ? '#333' : '#888') + ';cursor:' + (d.page >= d.pages ? 'default' : 'pointer') + ';font-family:inherit;font-size:0.7rem;"' + (d.page >= d.pages ? ' disabled' : '') + '>&rarr;</button>'
                 + '</div>';
         } catch(e) {}
     }
