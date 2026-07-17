@@ -363,7 +363,7 @@ if (Test-Path "$InstallDir\.git") {
 } else {
     if (Test-Path "$InstallDir") { Remove-Item -Recurse -Force "$InstallDir" }
     Write-Info "Cloning Cloud-DJ to $InstallDir..."
-    git clone $RepoUrl "$InstallDir" 2>&1
+    git clone $RepoUrl "$InstallDir" 2>&1 | Out-Null
     if ($LASTEXITCODE -ne 0) {
         Write-Err "Failed to clone repository. Check internet connection."
         pause; exit 1
@@ -396,10 +396,10 @@ if (-not (Test-Path $pipExe)) {
 
 Write-Info "Installing Python dependencies..."
 & $pipExe install --upgrade pip --quiet 2>&1 | Out-Null
-& $pipExe install -r requirements.txt --quiet 2>&1
+& $pipExe install -r requirements.txt --quiet 2>&1 | Out-Null
 if ($LASTEXITCODE -ne 0) {
-    Write-Warn "pip install had issues — retrying with details..."
-    & $pipExe install -r requirements.txt 2>&1
+    Write-Warn "pip install had issues — showing output:"
+    & $pipExe install -r requirements.txt 2>&1 | Out-Host
 }
 & $pipExe install yt-dlp --quiet 2>&1 | Out-Null
 Write-Ok "Python dependencies installed"
