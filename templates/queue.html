@@ -348,7 +348,7 @@
                             </div>
                         </div>
                         <div class="actions">
-                            <button class="love-btn {% if item.loved %}loved{% endif %}" onclick="toggleLove({{ item.id }}, this)">{% if item.loved %}&#9829;{% else %}&#9825;{% endif %}</button>
+                            <button class="love-btn {% if item.clean_url in loved_urls %}loved{% endif %}" onclick="toggleLove({{ item.id }}, this)">{% if item.clean_url in loved_urls %}&#9829;{% else %}&#9825;{% endif %}</button>
                         </div>
                     </div>
                     {% endfor %}

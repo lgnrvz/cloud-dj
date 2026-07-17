@@ -216,11 +216,13 @@ def queue():
         "SELECT * FROM loved_songs WHERE user_id=? ORDER BY loved_at DESC LIMIT 50",
         (current_user.id,)
     ).fetchall()
+    # Get set of loved URLs for the current user (for heart state on queue items)
+    loved_urls = set(r['clean_url'] for r in loved if r['clean_url'])
     conn.close()
     # Auto-start: if nothing is playing but there are pending items, advance
     if NOW_PLAYING.get('id') is None:
         _auto_start()
-    return render_template('queue.html', items=items, played=played, loved=loved, now=_enrich_now(dict(NOW_PLAYING)))
+    return render_template('queue.html', items=items, played=played, loved=loved, loved_urls=loved_urls, now=_enrich_now(dict(NOW_PLAYING)))
 
 @app.route('/loved-songs')
 @login_required
