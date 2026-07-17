@@ -264,28 +264,30 @@ def love_toggle(item_id):
     if not item:
         conn.close()
         return jsonify({'error': 'Not found'}), 404
-    # Toggle love
-    new_val = 0 if item['loved'] else 1
-    conn.execute("UPDATE queue SET loved=? WHERE id=?", (new_val, item_id))
-    # Also manage loved_songs table
-    if new_val:
-        existing = conn.execute(
-            "SELECT id FROM loved_songs WHERE user_id=? AND clean_url=?",
-            (current_user.id, item['clean_url'])
-        ).fetchone()
-        if not existing:
-            conn.execute(
-                "INSERT INTO loved_songs (user_id, username, clean_url, title) VALUES (?,?,?,?)",
-                (current_user.id, current_user.username, item['clean_url'], item['title'])
-            )
+    if not item['clean_url']:
+        conn.close()
+        return jsonify({'error': 'No URL'}), 400
+    # Check if current user already has this in their loved_songs
+    existing = conn.execute(
+        "SELECT id FROM loved_songs WHERE user_id=? AND clean_url=?",
+        (current_user.id, item['clean_url'])
+    ).fetchone()
+    if existing:
+        # Unlove
+        conn.execute("DELETE FROM loved_songs WHERE user_id=? AND clean_url=?",
+                     (current_user.id, item['clean_url']))
+        conn.commit()
+        conn.close()
+        return jsonify({'success': True, 'loved': False, 'title': item['title']})
     else:
+        # Love
         conn.execute(
-            "DELETE FROM loved_songs WHERE user_id=? AND clean_url=?",
-            (current_user.id, item['clean_url'])
+            "INSERT INTO loved_songs (user_id, username, clean_url, title) VALUES (?,?,?,?)",
+            (current_user.id, current_user.username, item['clean_url'], item['title'])
         )
-    conn.commit()
-    conn.close()
-    return jsonify({'success': True, 'loved': new_val, 'title': item['title']})
+        conn.commit()
+        conn.close()
+        return jsonify({'success': True, 'loved': True, 'title': item['title']})
 
 def _enrich_now(np):
     """Add video_id and queue_count to a now-playing dict."""
@@ -731,39 +733,6 @@ def admin_settings_leaderboard():
 def leaderboard_enabled():
     return jsonify({'show': SHOW_LEADERBOARD})
 
-@app.route('/admin/love/<int:item_id>', methods=['POST'])
-@login_required
-def admin_love(item_id):
-    """Admin can love any history item."""
-    if not current_user.is_admin:
-        return jsonify({'error': 'Unauthorized'}), 403
-    conn = get_db()
-    item = conn.execute("SELECT * FROM queue WHERE id=?", (item_id,)).fetchone()
-    if not item:
-        conn.close()
-        return jsonify({'error': 'Not found'}), 404
-    # Toggle love for the admin user
-    new_val = 0 if (item['loved'] and item['user_id'] == current_user.id) else 1
-    conn.execute("UPDATE queue SET loved=? WHERE id=?", (new_val, item_id))
-    if new_val:
-        existing = conn.execute(
-            "SELECT id FROM loved_songs WHERE user_id=? AND clean_url=?",
-            (current_user.id, item['clean_url'])
-        ).fetchone()
-        if not existing:
-            conn.execute(
-                "INSERT INTO loved_songs (user_id, username, clean_url, title) VALUES (?,?,?,?)",
-                (current_user.id, current_user.username, item['clean_url'], item['title'])
-            )
-    else:
-        conn.execute(
-            "DELETE FROM loved_songs WHERE user_id=? AND clean_url=?",
-            (current_user.id, item['clean_url'])
-        )
-    conn.commit()
-    conn.close()
-    return jsonify({'success': True, 'loved': new_val})
-
 @app.route('/score/save', methods=['POST'])
 @login_required
 def save_score():
@@ -822,7 +791,7 @@ def remove_user(user_id):
     u = conn.execute("SELECT is_admin FROM users WHERE id=?", (user_id,)).fetchone()
     if not u:
         conn.close()
-        return jsonify({'error': 'User not found'}), 404
+        return jsonify({'error': 'Not found'}), 404
     if u['is_admin']:
         conn.close()
         return jsonify({'error': 'Cannot delete admin accounts'}), 403
@@ -830,6 +799,32 @@ def remove_user(user_id):
     conn.commit()
     conn.close()
     return jsonify({'success': True})
+
+@app.route('/admin/love/<int:item_id>', methods=['POST'])
+@login_required
+def admin_love(item_id):
+    if not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized'}), 403
+    conn = get_db()
+    item = conn.execute("SELECT * FROM queue WHERE id=?", (item_id,)).fetchone()
+    if not item or not item['clean_url']:
+        conn.close()
+        return jsonify({'error': 'Not found'}), 404
+    # Toggle love in admin's loved_songs
+    existing = conn.execute(
+        "SELECT id FROM loved_songs WHERE user_id=? AND clean_url=?",
+        (current_user.id, item['clean_url'])
+    ).fetchone()
+    if existing:
+        conn.execute("DELETE FROM loved_songs WHERE user_id=? AND clean_url=?",
+                     (current_user.id, item['clean_url']))
+        conn.commit(); conn.close()
+        return jsonify({'success': True, 'loved': False})
+    else:
+        conn.execute("INSERT INTO loved_songs (user_id, username, clean_url, title) VALUES (?,?,?,?)",
+                     (current_user.id, current_user.username, item['clean_url'], item['title']))
+        conn.commit(); conn.close()
+        return jsonify({'success': True, 'loved': True})
 
 @app.route('/admin/reorder', methods=['POST'])
 @login_required
