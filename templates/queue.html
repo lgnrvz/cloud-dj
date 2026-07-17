@@ -451,7 +451,8 @@
     fetch('/scoring-enabled').then(r=>r.json()).then(d => { scoringOn = d.scoring; }).catch(()=>{});
 
     // Initial loved songs load (replaces server-rendered with paginated)
-    refreshLovedSongs();
+    console.log('[loved] calling refreshLovedSongs on page load');
+    refreshLovedSongs().catch(e => console.error('[loved] initial load error:', e));
 
     // Initial leaderboard load
     fetch('/leaderboard-enabled').then(r=>r.json()).then(d => {
@@ -915,6 +916,7 @@
         try {
             const resp = await fetch('/loved-songs?page=' + lovedPage);
             const d = await resp.json();
+            console.log('[loved] loaded:', d.items.length, 'items, page', d.page, '/', d.pages, 'total:', d.total);
             // Clamp page to valid range
             lovedPage = Math.min(d.pages, Math.max(1, lovedPage));
             const list = document.getElementById('lovedList');
