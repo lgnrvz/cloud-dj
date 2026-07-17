@@ -26,9 +26,9 @@
         .navbar a { color: #888; text-decoration: none; margin-left: 18px; font-size: 0.8rem; transition: .2s; }
         .navbar a:hover { color: #fff; }
         .container { max-width: 1200px; margin: 0 auto; padding: 20px; display: flex; gap: 20px; align-items: flex-start; }
-        .main-col { flex: 1; min-width: 0; }
-        .side-col { width: 300px; flex-shrink: 0; }
-        @media (max-width: 800px) { .container { flex-direction: column; } .side-col { width: 100%; } }
+        .main-col { flex: 4; min-width: 0; }
+        .side-col { flex: 1; min-width: 0; width: auto; }
+        @media (max-width: 800px) { .container { flex-direction: column; } .side-col { width: auto; } }
 
         .now-playing {
             background: linear-gradient(135deg, #0d0d16, #111122);
