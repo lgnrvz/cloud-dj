@@ -578,6 +578,31 @@ def admin():
     conn.close()
     return render_template('admin.html', items=items, history=history, users=users, now=dict(NOW_PLAYING))
 
+@app.route('/admin/users')
+@login_required
+def admin_users():
+    """JSON endpoint for paginated users."""
+    if not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized'}), 403
+    page = request.args.get('page', 1, type=int)
+    per_page = 9
+    offset = (page - 1) * per_page
+
+    conn = get_db()
+    total = conn.execute("SELECT COUNT(*) as c FROM users").fetchone()['c']
+    rows = conn.execute("SELECT * FROM users ORDER BY id DESC LIMIT ? OFFSET ?",
+                        (per_page, offset)).fetchall()
+    conn.close()
+
+    return jsonify({
+        'items': [{'id': r['id'], 'name': r['name'], 'username': r['username'],
+                   'is_admin': bool(r['is_admin']), 'created_at': r['created_at']} for r in rows],
+        'total': total,
+        'page': page,
+        'per_page': per_page,
+        'pages': (total + per_page - 1) // per_page
+    })
+
 @app.route('/admin/history')
 @login_required
 def admin_history():

@@ -181,13 +181,17 @@
             <div>
                 <div class="card">
                     <h2>Users</h2>
-                    {% for u in users %}
-                    <div class="user-item">
-                        <span class="name">{{ u.name }}</span>
-                        {% if u.is_admin %}<span class="badge-admin">Admin</span>{% endif %}
-                        <div class="joined">@{{ u.username }} &middot; {{ u.created_at[:10] }}</div>
+                    <div style="margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">
+                        <span style="color:#444;font-size:0.7rem;" id="usersTotal">0</span>
                     </div>
-                    {% endfor %}
+                    <div id="usersList">
+                        <div style="padding:16px;text-align:center;color:#333;font-size:0.75rem;">Loading...</div>
+                    </div>
+                    <div id="usersPages" style="display:flex;justify-content:center;align-items:center;gap:8px;padding:6px 0 2px 0;font-size:0.7rem;">
+                        <button id="usersPrev" onclick="loadUsers(curUsersPage-1)" style="background:none;border:none;color:#555;cursor:pointer;font-family:inherit;font-size:0.7rem;">&larr; Prev</button>
+                        <span id="usersPageInfo" style="color:#444;">Page 1 / 1</span>
+                        <button id="usersNext" onclick="loadUsers(curUsersPage+1)" style="background:none;border:none;color:#555;cursor:pointer;font-family:inherit;font-size:0.7rem;">Next &rarr;</button>
+                    </div>
                 </div>
 
                 <div class="card" style="margin-top:16px;">
@@ -195,8 +199,8 @@
                     <div class="srv-info">
                         <strong>Admin:</strong> admin / djadmin123<br>
                         <strong>URL:</strong> http://{{ request.host }}<br>
-                        <strong>Played:</strong> {{ history|length }} total<br>
-                        <strong>Users:</strong> {{ users|length }}
+                        <strong>Played:</strong> <span id="srvPlayed">{{ history|length }}</span> total<br>
+                        <strong>Users:</strong> <span id="srvUsers">{{ users|length }}</span>
                     </div>
                 </div>
 
@@ -220,6 +224,7 @@
     const npTrack = document.getElementById('npTrack');
     const npMeta = document.getElementById('npMeta');
     let curPage = 1;
+    let curUsersPage = 1;
     const currentUserId = {{ current_user.id }};
 
     setInterval(function(){
@@ -271,6 +276,34 @@
 
     // Load initial history
     loadHistory(1);
+
+    // Load paginated users
+    function loadUsers(page) {
+        curUsersPage = page;
+        fetch('/admin/users?page=' + page)
+            .then(r => r.json())
+            .then(d => {
+                document.getElementById('usersTotal').textContent = d.total + ' total';
+                document.getElementById('usersPageInfo').textContent = 'Page ' + d.page + ' / ' + d.pages;
+                document.getElementById('usersPrev').style.color = d.page > 1 ? '#888' : '#333';
+                document.getElementById('usersPrev').disabled = d.page <= 1;
+                document.getElementById('usersNext').style.color = d.page < d.pages ? '#888' : '#333';
+                document.getElementById('usersNext').disabled = d.page >= d.pages;
+                const list = document.getElementById('usersList');
+                if (d.items.length === 0) {
+                    list.innerHTML = '<div style="padding:16px;text-align:center;color:#333;font-size:0.75rem;">No users</div>';
+                    return;
+                }
+                list.innerHTML = d.items.map(u =>
+                    '<div class="user-item">'
+                    + '<span class="name">' + escapeHtml(u.name) + '</span>'
+                    + (u.is_admin ? '<span class="badge-admin">Admin</span>' : '')
+                    + '<div class="joined">@' + escapeHtml(u.username) + ' &middot; ' + (u.created_at || '').substring(0,10) + '</div>'
+                    + '</div>'
+                ).join('');
+            }).catch(() => {});
+    }
+    loadUsers(1);
 
     // Load scoring setting
     fetch('/admin/settings').then(r=>r.json()).then(d => {
