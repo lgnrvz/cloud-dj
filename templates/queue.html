@@ -741,6 +741,9 @@
     setInterval(pollNowPlaying, 4000);
     {% endif %}
 
+    // Loved songs pagination state (must be before refreshLovedSongs call)
+    let lovedPage = 1;
+
     // Initial loved songs load (all users)
     refreshLovedSongs();
 
@@ -897,7 +900,6 @@
     }
 
     /** Refresh loved songs list from JSON endpoint with pagination */
-    let lovedPage = 1;
     async function refreshLovedSongs() {
         lovedPage = Math.max(1, lovedPage);
         try {
