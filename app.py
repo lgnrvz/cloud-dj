@@ -222,6 +222,28 @@ def queue():
         _auto_start()
     return render_template('queue.html', items=items, played=played, loved=loved, now=_enrich_now(dict(NOW_PLAYING)))
 
+@app.route('/loved-songs')
+@login_required
+def loved_songs():
+    """JSON endpoint for paginated loved songs."""
+    page = request.args.get('page', 1, type=int)
+    per_page = 10
+    offset = (page - 1) * per_page
+    conn = get_db()
+    total = conn.execute("SELECT COUNT(*) as c FROM loved_songs WHERE user_id=?", (current_user.id,)).fetchone()['c']
+    rows = conn.execute(
+        "SELECT * FROM loved_songs WHERE user_id=? ORDER BY loved_at DESC LIMIT ? OFFSET ?",
+        (current_user.id, per_page, offset)
+    ).fetchall()
+    conn.close()
+    return jsonify({
+        'items': [dict(r) for r in rows],
+        'total': total,
+        'page': page,
+        'per_page': per_page,
+        'pages': (total + per_page - 1) // per_page
+    })
+
 def _auto_start():
     """Advance to first pending item, or Auto-DJ from history."""
     next_item = get_next_pending()
@@ -231,6 +253,42 @@ def _auto_start():
         conn.execute("UPDATE queue SET status='playing' WHERE id=?", (next_item['id'],))
         conn.commit()
         conn.close()
+
+@app.route('/love/<int:item_id>', methods=['POST'])
+@login_required
+def love_toggle(item_id):
+    conn = get_db()
+    item = conn.execute("SELECT * FROM queue WHERE id=?", (item_id,)).fetchone()
+    if not item:
+        conn.close()
+        return jsonify({'error': 'Not found'}), 404
+    # Check ownership or admin love
+    if item['user_id'] != current_user.id and not current_user.is_admin:
+        # Allow loving on history via admin endpoint only
+        conn.close()
+        return jsonify({'error': 'Not your song'}), 403
+    # Toggle love
+    new_val = 0 if item['loved'] else 1
+    conn.execute("UPDATE queue SET loved=? WHERE id=?", (new_val, item_id))
+    # Also manage loved_songs table
+    if new_val:
+        existing = conn.execute(
+            "SELECT id FROM loved_songs WHERE user_id=? AND clean_url=?",
+            (current_user.id, item['clean_url'])
+        ).fetchone()
+        if not existing:
+            conn.execute(
+                "INSERT INTO loved_songs (user_id, username, clean_url, title) VALUES (?,?,?,?)",
+                (current_user.id, current_user.username, item['clean_url'], item['title'])
+            )
+    else:
+        conn.execute(
+            "DELETE FROM loved_songs WHERE user_id=? AND clean_url=?",
+            (current_user.id, item['clean_url'])
+        )
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True, 'loved': new_val, 'title': item['title']})
 
 def _enrich_now(np):
     """Add video_id and queue_count to a now-playing dict."""
@@ -342,35 +400,9 @@ def auto_advance():
 
 @app.route('/love/<int:item_id>', methods=['POST'])
 @login_required
-def love_toggle(item_id):
-    conn = get_db()
-    item = conn.execute("SELECT * FROM queue WHERE id=?", (item_id,)).fetchone()
-    if not item:
-        conn.close()
-        return jsonify({'error': 'Not found'}), 404
-    if item['user_id'] != current_user.id:
-        conn.close()
-        return jsonify({'error': 'Not your song'}), 403
-    new_val = 0 if item['loved'] else 1
-    conn.execute("UPDATE queue SET loved=? WHERE id=?", (new_val, item_id))
-    if new_val:
-        existing = conn.execute(
-            "SELECT id FROM loved_songs WHERE user_id=? AND clean_url=?",
-            (current_user.id, item['clean_url'])
-        ).fetchone()
-        if not existing:
-            conn.execute(
-                "INSERT INTO loved_songs (user_id, username, clean_url, title) VALUES (?,?,?,?)",
-                (current_user.id, current_user.username, item['clean_url'], item['title'])
-            )
-    else:
-        conn.execute(
-            "DELETE FROM loved_songs WHERE user_id=? AND clean_url=?",
-            (current_user.id, item['clean_url'])
-        )
-    conn.commit()
-    conn.close()
-    return jsonify({'success': True, 'loved': new_val})
+def love_toggle_old(item_id):
+    # Route handled by love_toggle above — kept for legacy compatibility
+    return love_toggle(item_id)
 
 @app.route('/loved/add/<int:loved_id>', methods=['POST'])
 @login_required
