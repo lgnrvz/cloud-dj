@@ -374,6 +374,7 @@
     let lastQueueCount = -1;
     let confettiAnim = null;
     let scoringOn = false;
+    let prevPlayingId = null;
 
     // Check if scoring is enabled
     fetch('/scoring-enabled').then(r=>r.json()).then(d => { scoringOn = d.scoring; }).catch(()=>{});
@@ -474,6 +475,14 @@
 
             if (np.id !== null && np.id !== undefined) {
                 if (currentPlayingId !== np.id && !loadingNext) {
+                    // Track changed — show scoring if previous was a real queue item
+                    if (prevPlayingId && prevPlayingId > 0) {
+                        try {
+                            const sr = await fetch('/scoring-enabled').then(r => r.json());
+                            if (sr.scoring) showVideokeScore();
+                        } catch(e) {}
+                    }
+                    prevPlayingId = null;
                     await loadTrack(np);
                 }
             }
@@ -484,13 +493,7 @@
 
     /** Advance when track ends */
     video.addEventListener('ended', async function() {
-        // Check scoring status live (in case admin toggled it mid-song)
-        try {
-            const sr = await fetch('/scoring-enabled').then(r => r.json());
-            if (sr.scoring && currentPlayingId && currentPlayingId > 0) {
-                showVideokeScore();
-            }
-        } catch(e) {}
+        prevPlayingId = currentPlayingId;
         currentPlayingId = null;
         loadingNext = true;
         setStatus('#ffd700', 'Loading next...');
