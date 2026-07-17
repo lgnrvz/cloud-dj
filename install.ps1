@@ -229,6 +229,33 @@ if (-not $python) { $python = Test-RealCommand "python" }
 
 if (-not $python) {
     Write-Warn "Python not found (or Microsoft Store stub detected)"
+
+    # Remove the Microsoft Store stubs that block real Python installation
+    $stubPaths = @(
+        "$env:LOCALAPPDATA\Microsoft\WindowsApps\python.exe",
+        "$env:LOCALAPPDATA\Microsoft\WindowsApps\python3.exe"
+    )
+    $stubsRemoved = $false
+    foreach ($stub in $stubPaths) {
+        if (Test-Path $stub) {
+            try {
+                # Take ownership and remove the stub files
+                takeown /f "$stub" /a 2>&1 | Out-Null
+                icacls "$stub" /grant "*S-1-5-32-544:F" 2>&1 | Out-Null
+                Remove-Item -Force "$stub" 2>&1 | Out-Null
+                if (-not (Test-Path $stub)) {
+                    Write-Ok "Removed Store stub: $stub"
+                    $stubsRemoved = $true
+                }
+            } catch {
+                Write-Warn "Could not remove Store stub: $stub"
+                Write-Warn "  To fix manually: Settings > Apps > Advanced app settings > App execution aliases"
+                Write-Warn "  Turn OFF 'python.exe' and 'python3.exe'"
+            }
+        }
+    }
+    if ($stubsRemoved) { Refresh-Path }
+
     # Try winget first (works on most networks)
     $installed = Install-WithWinget -Id "Python.Python.3.12" -DisplayName "Python 3.12"
     if ($installed) {
