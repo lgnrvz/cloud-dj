@@ -2,16 +2,17 @@
 <#
 .SYNOPSIS
     Cloud-DJ — Desktop Installer for Windows
-    Turns any Windows machine into a LAN music server.
+    Fully automatic — installs everything needed.
 .DESCRIPTION
     Installs Cloud-DJ on your Windows PC:
+    - Auto-downloads & installs Python, Git, Node.js, ffmpeg, yt-dlp if missing
     - Python virtual environment with all dependencies
     - Windows Firewall rule for port 5050
     - Scheduled Task for auto-start on boot
     - LAN access URL printed at the end
 .NOTES
     Run: powershell -ExecutionPolicy Bypass -File install.ps1
-    Or right-click → "Run with PowerShell"
+    Or right-click -> "Run with PowerShell"
 #>
 
 $Host.UI.RawUI.WindowTitle = "Cloud-DJ Installer"
@@ -19,68 +20,102 @@ $Port = if ($env:PORT) { $env:PORT } else { 5050 }
 $InstallDir = "$env:USERPROFILE\cloud-dj"
 $RepoUrl = "https://github.com/lgnrvz/cloud-dj.git"
 $ServiceName = "CloudDJ"
-$AllOk = $true  # Tracks if everything succeeded
+$AllOk = $true
 
 function Write-Info  { Write-Host "[INFO]  $_" -ForegroundColor Cyan }
 function Write-Ok    { Write-Host "[OK]    $_" -ForegroundColor Green }
 function Write-Warn  { Write-Host "[WARN]  $_" -ForegroundColor Yellow }
 function Write-Err   { Write-Host "[ERROR] $_" -ForegroundColor Red; $script:AllOk = $false }
 
-# Quick-check: does a command exist (not the Microsoft Store stub)?
+# ── Helpers ──────────────────────────────────────────────────
+
+# Check if a real command exists (NOT the Microsoft Store stub)
 function Test-RealCommand {
     param($Name)
     $cmd = Get-Command $Name -ErrorAction SilentlyContinue
     if (-not $cmd) { return $null }
-    # On Windows 10/11, the Microsoft Store python stub is a 0-byte exe in
-    # %LOCALAPPDATA%\Microsoft\WindowsApps that just opens the Store.
-    # Real Python lives elsewhere. Skip it if it's from WindowsApps.
     $source = $cmd.Source
     if ($source -and $source -like "*WindowsApps*") {
-        return $null  # This is the Store stub, ignore it
+        return $null  # Microsoft Store stub — skip
     }
-    # Make sure it actually runs
-    try {
-        $result = & $source --version 2>&1 | Out-String
-        if ($result -match "\d+\.\d+") {
-            return $cmd
-        }
-    } catch { }
+    # Verify it actually runs
+    try { $ver = & $source --version 2>&1; if ($ver -match "\d+\.\d+") { return $cmd } } catch { }
     return $null
 }
 
-# Install via winget with visible output
-function Install-WithWinget {
-    param($Id, $DisplayName, $Url)
-
-    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-        Write-Warn "winget not available. Install $DisplayName manually:"
-        Write-Host "  $Url" -ForegroundColor Yellow
-        return $false
-    }
-
-    Write-Info "Installing $DisplayName via winget (this may take a minute)..."
-    winget source update --accept-source-agreements 2>&1 | Out-Null
-
-    $proc = Start-Process -FilePath winget -ArgumentList @(
-        "install", "--id", $Id, "--silent",
-        "--accept-package-agreements", "--accept-source-agreements"
-    ) -NoNewWindow -Wait -PassThru
-
-    if ($proc.ExitCode -eq 0) {
-        Write-Ok "$DisplayName installed via winget"
-        return $true
-    } else {
-        Write-Warn "winget exit code: $($proc.ExitCode) for $DisplayName"
-        Write-Warn "Install manually: $Url"
-        return $false
-    }
-}
-
-# Refresh PATH from registry so newly-installed tools are found
+# Refresh PATH from registry
 function Refresh-Path {
     $machine = [Environment]::GetEnvironmentVariable("Path", "Machine")
     $user = [Environment]::GetEnvironmentVariable("Path", "User")
     $env:Path = "$machine;$user"
+}
+
+# Download and silently install a tool
+function Install-Direct {
+    param(
+        $Name,              # Display name
+        $Url,               # Download URL
+        $InstallerArgs,     # Silent install arguments
+        $ExeName,           # What exe name to check after install
+        [string[]]$FallbackPaths  # Where to look if not on PATH
+    )
+
+    Write-Info "Downloading $Name..."
+    $tempDir = "$env:TEMP\cloud-dj-install"
+    New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
+    $installer = "$tempDir\$Name-installer.exe"
+
+    try {
+        # Download with progress bar
+        Invoke-WebRequest -Uri $Url -OutFile $installer -UseBasicParsing
+        Write-Ok "Downloaded $Name ($([math]::Round((Get-Item $installer).Length / 1MB, 1)) MB)"
+    } catch {
+        Write-Warn "Download failed: $_"
+        Write-Warn "Please install $Name manually from: $(Split-Path $Url -Parent)"
+        return $false
+    }
+
+    Write-Info "Installing $Name (silent)..."
+
+    # For Python, make sure we pass install options
+    if ($Name -eq "Python") {
+        $psi = New-Object System.Diagnostics.ProcessStartInfo
+        $psi.FileName = $installer
+        $psi.Arguments = $InstallerArgs
+        $psi.UseShellExecute = $true  # Needed for admin elevation
+        $psi.Verb = "runas"  # Request admin
+        $proc = [System.Diagnostics.Process]::Start($psi)
+        if (-not $proc) {
+            Write-Warn "Could not start $Name installer. Try running PowerShell as Administrator."
+            return $false
+        }
+        $proc.WaitForExit()
+    } else {
+        $proc = Start-Process -FilePath $installer -ArgumentList $InstallerArgs -Wait -PassThru
+    }
+
+    if ($proc.ExitCode -ne 0 -and $proc.ExitCode -ne 1641 -and $proc.ExitCode -ne 3010) {
+        Write-Warn "$Name installer exit code: $($proc.ExitCode) (may still have succeeded)"
+    }
+
+    # Refresh PATH and wait for install to settle
+    Refresh-Path
+    Start-Sleep -Seconds 4
+
+    # Check if it worked
+    $check = Test-RealCommand $ExeName
+    if (-not $check -and $FallbackPaths) {
+        foreach ($fp in $FallbackPaths) {
+            if (Test-Path $fp) { $check = Get-Command $fp; break }
+        }
+    }
+    if ($check) {
+        Write-Ok "$Name installed"
+        return $true
+    } else {
+        Write-Warn "$Name install may have failed. Try installing manually from $Url"
+        return $false
+    }
 }
 
 # ── Banner ──────────────────────────────────────────────────
@@ -99,118 +134,121 @@ Write-Host @"
 $WinVer = [Environment]::OSVersion.Version
 if ($WinVer.Major -lt 10) {
     Write-Err "Windows 10 or later required (detected: $($WinVer.Major).$($WinVer.Minor))"
-    exit 1
+    pause; exit 1
 }
 Write-Ok "Windows $($WinVer.Major).$($WinVer.Minor) detected"
 
-# ── Step 2: Check/Install Git ───────────────────────────────
+# ── Step 2: Install Git ─────────────────────────────────────
 Write-Info "Checking Git..."
 $git = Test-RealCommand "git"
 if (-not $git) {
-    $installed = Install-WithWinget -Id "Git.Git" -DisplayName "Git" -Url "https://git-scm.com/download/win"
-    if ($installed) {
-        Refresh-Path
-        Start-Sleep -Seconds 3
-        $git = Test-RealCommand "git"
+    Write-Warn "Git not found — will install it"
+    $installed = Install-Direct -Name "Git" `
+        -Url "https://github.com/git-for-windows/git/releases/download/v2.47.0.windows.2/Git-2.47.0-64-bit.exe" `
+        -InstallerArgs "/VERYSILENT /NORESTART /SUPPRESSMSGBOXES" `
+        -ExeName "git" `
+        -FallbackPaths @("$env:ProgramFiles\Git\bin\git.exe", "${env:ProgramFiles(x86)}\Git\bin\git.exe")
+    if (-not $installed) {
+        Write-Err "Git is required. Install from https://git-scm.com/download/win then re-run."
+        pause; exit 1
     }
+    $git = Test-RealCommand "git"
 }
-if ($git) {
-    Write-Ok "Git: $($git.Source)"
-} else {
-    Write-Err "Git is required. Install from https://git-scm.com/download/win then re-run."
-    exit 1
-}
+if ($git) { Write-Ok "Git: $($git.Source)" }
 
-# ── Step 3: Check/Install Python ────────────────────────────
+# ── Step 3: Install Python ──────────────────────────────────
 Write-Info "Checking Python..."
 $python = Test-RealCommand "python3"
 if (-not $python) { $python = Test-RealCommand "python" }
 
 if (-not $python) {
-    $installed = Install-WithWinget -Id "Python.Python.3.11" -DisplayName "Python 3.11" -Url "https://python.org/downloads/"
+    Write-Warn "Python not found (or Microsoft Store stub detected) — will install it"
+    Write-Info "The installer will download Python 3.12 and install it silently."
+    Write-Info "If a UAC prompt appears, click YES."
+
+    $installed = Install-Direct -Name "Python" `
+        -Url "https://www.python.org/ftp/python/3.12.8/python-3.12.8-amd64.exe" `
+        -InstallerArgs "/quiet InstallAllUsers=1 PrependPath=1 Include_test=0" `
+        -ExeName "python" `
+        -FallbackPaths @(
+            "$env:ProgramFiles\Python312\python.exe",
+            "$env:LocalAppData\Programs\Python\Python312\python.exe"
+        )
     if ($installed) {
-        Refresh-Path
-        Start-Sleep -Seconds 4
         $python = Test-RealCommand "python"
-    }
-}
-# Also check common install paths directly (winget often puts it here)
-if (-not $python) {
-    $commonPaths = @(
-        "$env:ProgramFiles\Python311\python.exe",
-        "$env:ProgramFiles\Python312\python.exe",
-        "$env:ProgramFiles\Python313\python.exe",
-        "$env:LocalAppData\Programs\Python\Python311\python.exe",
-        "$env:LocalAppData\Programs\Python\Python312\python.exe",
-        "$env:LocalAppData\Programs\Python\Python313\python.exe"
-    )
-    foreach ($p in $commonPaths) {
-        if (Test-Path $p) {
-            try {
-                $ver = & $p --version 2>&1
-                if ($ver -match "\d+\.\d+") {
-                    $python = Get-Command $p
-                    break
-                }
-            } catch { }
+        if (-not $python) {
+            foreach ($p in @("$env:ProgramFiles\Python312\python.exe", "$env:LocalAppData\Programs\Python\Python312\python.exe")) {
+                if (Test-Path $p) { $python = Get-Command $p; break }
+            }
         }
     }
 }
+
 if (-not $python) {
-    Write-Err "Python not found!"
-    Write-Host "  1. Download Python from: https://python.org/downloads/" -ForegroundColor Yellow
-    Write-Host "  2. Run the installer — CHECK 'Add Python to PATH'" -ForegroundColor Yellow
-    Write-Host "  3. RESTART PowerShell, then run this installer again" -ForegroundColor Yellow
-    exit 1
+    Write-Err "Python installation failed."
+    Write-Host "  Download and install Python 3.12 manually from:" -ForegroundColor Yellow
+    Write-Host "  https://www.python.org/downloads/" -ForegroundColor Yellow
+    Write-Host "  CHECK 'Add Python to PATH' during install, then re-run this installer." -ForegroundColor Yellow
+    pause; exit 1
 }
 Write-Ok "Python: $($python.Source)"
 
-# ── Step 4: Check/Install Node.js ───────────────────────────
+# ── Step 4: Install Node.js ─────────────────────────────────
 Write-Info "Checking Node.js..."
 $node = Test-RealCommand "node"
 if (-not $node) {
-    $installed = Install-WithWinget -Id "OpenJS.NodeJS.LTS" -DisplayName "Node.js LTS" -Url "https://nodejs.org"
-    if ($installed) {
-        Refresh-Path
-        Start-Sleep -Seconds 3
-        $node = Test-RealCommand "node"
-    }
-}
-if (-not $node) {
-    $commonNodePaths = @(
-        "$env:ProgramFiles\nodejs\node.exe",
-        "${env:ProgramFiles(x86)}\nodejs\node.exe"
-    )
-    foreach ($p in $commonNodePaths) {
-        if (Test-Path $p) { $node = Get-Command $p; break }
-    }
+    Write-Warn "Node.js not found — will install it"
+    $installed = Install-Direct -Name "NodeJS" `
+        -Url "https://nodejs.org/dist/v22.12.0/node-v22.12.0-x64.msi" `
+        -InstallerArgs "/qn /norestart" `
+        -ExeName "node" `
+        -FallbackPaths @("$env:ProgramFiles\nodejs\node.exe")
+    if ($installed) { $node = Test-RealCommand "node" }
 }
 if ($node) {
     Write-Ok "Node.js: $($node.Source)"
 } else {
     Write-Warn "Node.js not found — yt-dlp will use slower Python JS runtime"
-    Write-Warn "Install from https://nodejs.org for better performance"
 }
 
-# ── Step 5: Check/Install ffmpeg ────────────────────────────
+# ── Step 5: Install ffmpeg ──────────────────────────────────
 Write-Info "Checking ffmpeg..."
 $ffmpeg = Test-RealCommand "ffmpeg"
 if (-not $ffmpeg) {
-    $installed = Install-WithWinget -Id "Gyan.FFmpeg" -DisplayName "ffmpeg" -Url "https://ffmpeg.org/download.html"
-    if ($installed) {
-        Refresh-Path
-        Start-Sleep -Seconds 3
-        $ffmpeg = Test-RealCommand "ffmpeg"
+    Write-Warn "ffmpeg not found — will install it"
+    # ffmpeg via direct download is trickier (zip extraction + PATH)
+    # Try winget first (it handled ffmpeg well in testing)
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        Write-Info "Installing ffmpeg via winget..."
+        winget source update --accept-source-agreements 2>&1 | Out-Null
+        $proc = Start-Process -FilePath winget -ArgumentList @(
+            "install", "--id", "Gyan.FFmpeg", "--silent",
+            "--accept-package-agreements", "--accept-source-agreements"
+        ) -NoNewWindow -Wait -PassThru
+        if ($proc.ExitCode -eq 0) {
+            Refresh-Path; Start-Sleep -Seconds 3
+            $ffmpeg = Test-RealCommand "ffmpeg"
+        }
+    }
+    if (-not $ffmpeg) {
+        Write-Warn "Could not install ffmpeg automatically."
+        Write-Warn "Some yt-dlp formats may not work. Install from https://ffmpeg.org"
     }
 }
-if ($ffmpeg) {
-    Write-Ok "ffmpeg: $($ffmpeg.Source)"
-} else {
-    Write-Warn "ffmpeg not found — some yt-dlp formats may not work"
-    Write-Warn "Install from https://ffmpeg.org/download.html"
+if ($ffmpeg) { Write-Ok "ffmpeg: $($ffmpeg.Source)" }
+else { Write-Warn "ffmpeg not found — some yt-dlp formats may not work" }
+
+# ── Step 6: Install yt-dlp ──────────────────────────────────
+Write-Info "Installing yt-dlp (system-wide via pip)..."
+try {
+    & $python.Source -m pip install --user yt-dlp --quiet 2>&1 | Out-Null
+    Refresh-Path
+    Write-Ok "yt-dlp installed"
+} catch {
+    Write-Warn "yt-dlp system install failed — will install in venv later"
 }
 
-# ── Step 6: Clone / Pull the repo ───────────────────────────
+# ── Step 7: Clone / Pull the repo ───────────────────────────
 Write-Info "Setting up application..."
 if (Test-Path "$InstallDir\.git") {
     Push-Location "$InstallDir"
@@ -218,74 +256,63 @@ if (Test-Path "$InstallDir\.git") {
     Pop-Location
     Write-Ok "Repository updated"
 } else {
-    if (Test-Path "$InstallDir") {
-        Remove-Item -Recurse -Force "$InstallDir"
-    }
+    if (Test-Path "$InstallDir") { Remove-Item -Recurse -Force "$InstallDir" }
     Write-Info "Cloning Cloud-DJ to $InstallDir..."
     git clone $RepoUrl "$InstallDir" 2>&1
     if ($LASTEXITCODE -ne 0) {
-        Write-Err "Failed to clone repository. Check your internet connection."
-        exit 1
+        Write-Err "Failed to clone repository. Check internet connection."
+        pause; exit 1
     }
     Write-Ok "Repository cloned"
 }
 
 Set-Location "$InstallDir"
 
-# ── Step 7: Create Virtual Environment ──────────────────────
+# ── Step 8: Create Virtual Environment ──────────────────────
 Write-Info "Setting up Python virtual environment..."
 if (-not (Test-Path ".venv")) {
     & $python.Source -m venv .venv
     if ($LASTEXITCODE -ne 0) {
-        Write-Err "Failed to create virtual environment. Is Python installed properly?"
-        exit 1
+        Write-Err "Failed to create virtual environment."
+        pause; exit 1
     }
     Write-Ok "Virtual environment created"
 } else {
     Write-Ok "Virtual environment already exists"
 }
 
-# Define pip path — use .exe extension to avoid PowerShell module-resolution nonsense
+$venvPython = Join-Path (Get-Location) ".venv\Scripts\python.exe"
 $pipExe = Join-Path (Get-Location) ".venv\Scripts\pip.exe"
+if (-not (Test-Path $pipExe)) { $pipExe = Join-Path (Get-Location) ".venv\Scripts\pip3.exe" }
 if (-not (Test-Path $pipExe)) {
-    # Fallback: pip might be pip3.exe
-    $pipExe = Join-Path (Get-Location) ".venv\Scripts\pip3.exe"
-}
-if (-not (Test-Path $pipExe)) {
-    Write-Err "pip not found in virtual environment (.venv\Scripts\pip.exe)"
-    exit 1
+    Write-Err "pip not found in virtual environment"
+    pause; exit 1
 }
 
 Write-Info "Installing Python dependencies..."
 & $pipExe install --upgrade pip --quiet 2>&1 | Out-Null
 & $pipExe install -r requirements.txt --quiet 2>&1
 if ($LASTEXITCODE -ne 0) {
-    Write-Warn "pip install had issues — retrying with verbose output..."
+    Write-Warn "pip install had issues — retrying with details..."
     & $pipExe install -r requirements.txt 2>&1
 }
 & $pipExe install yt-dlp --quiet 2>&1 | Out-Null
 Write-Ok "Python dependencies installed"
 
-# ── Step 8: Verify venv paths ──────────────────────────────
-$venvPython = Join-Path (Get-Location) ".venv\Scripts\python.exe"
+# ── Step 9: Verify venv ──────────────────────────────────
 if (-not (Test-Path $venvPython)) {
-    Write-Err "Virtual environment is broken — missing python.exe in .venv\Scripts"
-    exit 1
+    Write-Err "Virtual environment is broken — missing python.exe"
+    pause; exit 1
 }
 $venvYtdlp = Join-Path (Get-Location) ".venv\Scripts\yt-dlp.exe"
 if (-not (Test-Path $venvYtdlp)) {
     $found = Get-ChildItem (Join-Path (Get-Location) ".venv\Scripts\yt-dlp*") -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($found) {
-        $venvYtdlp = $found.FullName
-    } else {
-        Write-Warn "yt-dlp not found in venv — installing now"
-        & $pipExe install yt-dlp 2>&1 | Out-Null
-    }
+    if (-not $found) { & $pipExe install yt-dlp 2>&1 | Out-Null }
 }
 Write-Ok "Venv Python: $venvPython"
-Write-Ok "app.py auto-detects yt-dlp and node (no manual config needed)"
+Write-Ok "app.py auto-detects all tools (no manual config needed)"
 
-# ── Step 9: Open Windows Firewall ──────────────────────────
+# ── Step 10: Open Windows Firewall ──────────────────────────
 Write-Info "Opening port $Port in Windows Firewall..."
 try {
     $rule = Get-NetFirewallRule -DisplayName "Cloud-DJ (TCP $Port)" -ErrorAction SilentlyContinue
@@ -293,16 +320,16 @@ try {
         New-NetFirewallRule -DisplayName "Cloud-DJ (TCP $Port)" `
             -Direction Inbound -LocalPort $Port -Protocol TCP -Action Allow `
             -Profile Private,Domain -ErrorAction Stop | Out-Null
-        Write-Ok "Firewall rule created for port $Port"
+        Write-Ok "Firewall rule created"
     } else {
         Write-Ok "Firewall rule already exists"
     }
 } catch {
-    Write-Warn "Could not create firewall rule. To add manually:"
-    Write-Host "  netsh advfirewall firewall add rule name=`"Cloud-DJ`" dir=in action=allow protocol=TCP localport=$Port" -ForegroundColor Yellow
+    Write-Warn "Could not create firewall rule."
+    Write-Host "  To add manually: netsh advfirewall firewall add rule name=`"Cloud-DJ`" dir=in action=allow protocol=TCP localport=$Port" -ForegroundColor Yellow
 }
 
-# ── Step 10: Create Scheduled Task for auto-start ──────────
+# ── Step 11: Create Scheduled Task for auto-start ──────────
 Write-Info "Setting up auto-start via Task Scheduler..."
 try {
     $existing = Get-ScheduledTask -TaskName $ServiceName -ErrorAction SilentlyContinue
@@ -314,16 +341,15 @@ try {
         $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Limited
         Register-ScheduledTask -TaskName $ServiceName -Action $action -Trigger $trigger `
             -Settings $settings -Principal $principal -Force | Out-Null
-        Write-Ok "Scheduled Task '$ServiceName' created (starts on boot)"
+        Write-Ok "Scheduled Task '$ServiceName' created"
     } else {
-        Write-Ok "Scheduled Task '$ServiceName' already exists"
+        Write-Ok "Scheduled Task already exists"
     }
 } catch {
-    Write-Warn "Could not create Scheduled Task. Run as Administrator or set up manually."
-    Write-Warn "To auto-start: add $InstallDir\start-cloud-dj.bat to shell:startup"
+    Write-Warn "Could not create Scheduled Task. Run as Administrator or use the startup script instead."
 }
 
-# ── Step 11: Generate startup script ───────────────────────
+# ── Step 12: Generate startup script ───────────────────────
 $batContent = @"
 @echo off
 cd /d "$InstallDir"
@@ -332,7 +358,7 @@ start /min "" "$venvPython" "app.py"
 Set-Content -Path "$InstallDir\start-cloud-dj.bat" -Value $batContent
 Write-Ok "Startup script: $InstallDir\start-cloud-dj.bat"
 
-# ── Step 12: Start the server ──────────────────────────────
+# ── Step 13: Start the server ──────────────────────────────
 $portInUse = $false
 try {
     $listener = New-Object System.Net.Sockets.TcpClient
@@ -352,12 +378,12 @@ if (-not $portInUse) {
     $proc = [System.Diagnostics.Process]::Start($psi)
     Write-Ok "Server started (PID: $($proc.Id))"
 } else {
-    Write-Ok "Server is already running"
+    Write-Ok "Server is already running on port $Port"
 }
 
-# ── Step 13: Wait and verify ───────────────────────────────
+# ── Step 14: Wait and verify ───────────────────────────────
 Write-Info "Verifying server..."
-Start-Sleep -Seconds 4
+Start-Sleep -Seconds 5
 try {
     $response = Invoke-WebRequest -Uri "http://localhost:$Port" -TimeoutSec 5 -UseBasicParsing
     if ($response.StatusCode -eq 200 -or $response.StatusCode -eq 302) {
@@ -367,7 +393,7 @@ try {
     Write-Warn "Server may not be ready yet. Try: http://localhost:$Port"
 }
 
-# ── Step 14: Get LAN IP ────────────────────────────────────
+# ── Step 15: Get LAN IP ────────────────────────────────────
 $lanIp = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object {
     $_.IPAddress -like "192.*" -or $_.IPAddress -like "10.*" -or ($_.IPAddress -like "172.*" -and $_.IPAddress -like "172.1[6-9].*")
 }).IPAddress | Select-Object -First 1
