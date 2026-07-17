@@ -300,6 +300,7 @@
                     + '<span class="name">' + escapeHtml(u.name) + '</span>'
                     + (u.is_admin ? '<span class="badge-admin">Admin</span>' : '')
                     + '<div class="joined">@' + escapeHtml(u.username) + ' &middot; ' + (u.created_at || '').substring(0,10) + '</div>'
+                    + (u.is_admin ? '' : '<button class="del-btn" onclick="deleteUser(' + u.id + ',\'' + escapeHtml(u.username) + '\')" title="Delete user">&#x2715;</button>')
                     + '</div>'
                 ).join('');
             }).catch(() => {});
@@ -372,6 +373,16 @@
                     loadUsers(1);
                     document.getElementById('srvUsers').textContent = d.remaining;
                 }
+            });
+    }
+
+    function deleteUser(id, username) {
+        if (!confirm('Delete user "' + username + '"? This cannot be undone.')) return;
+        fetch('/admin/remove-user/' + id, { method: 'POST' })
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) loadUsers(curUsersPage);
+                else alert(d.error || 'Failed');
             });
     }
     </script>

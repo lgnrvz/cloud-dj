@@ -790,6 +790,24 @@ def clear_users():
     conn.close()
     return jsonify({'success': True, 'remaining': remaining})
 
+@app.route('/admin/remove-user/<int:user_id>', methods=['POST'])
+@login_required
+def remove_user(user_id):
+    if not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized'}), 403
+    conn = get_db()
+    u = conn.execute("SELECT is_admin FROM users WHERE id=?", (user_id,)).fetchone()
+    if not u:
+        conn.close()
+        return jsonify({'error': 'User not found'}), 404
+    if u['is_admin']:
+        conn.close()
+        return jsonify({'error': 'Cannot delete admin accounts'}), 403
+    conn.execute("DELETE FROM users WHERE id=?", (user_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True})
+
 @app.route('/admin/reorder', methods=['POST'])
 @login_required
 def reorder():
