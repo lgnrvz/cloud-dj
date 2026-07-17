@@ -45,28 +45,78 @@ if ($WinVer.Major -lt 10) {
 }
 Write-Ok "Windows $($WinVer.Major).$($WinVer.Minor) detected"
 
+# ── Helper: Install via winget with visible output ──────────
+function Install-WithWinget {
+    param($Id, $DisplayName, $Url)
+    
+    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+        Write-Warn "winget not available. Install $DisplayName manually:"
+        Write-Host "  $Url" -ForegroundColor Yellow
+        return $false
+    }
+    
+    Write-Info "Installing $DisplayName via winget (this may take a minute)..."
+    
+    # Accept source agreement upfront so it doesn't hang
+    winget source update --accept-source-agreements 2>&1 | Out-Null
+    
+    $proc = Start-Process -FilePath winget -ArgumentList @(
+        "install", "--id", $Id, "--silent",
+        "--accept-package-agreements", "--accept-source-agreements"
+    ) -NoNewWindow -Wait -PassThru
+    
+    if ($proc.ExitCode -eq 0) {
+        Write-Ok "$DisplayName installed via winget"
+        return $true
+    } else {
+        Write-Warn "winget exit code: $($proc.ExitCode) for $DisplayName"
+        Write-Warn "Install manually: $Url"
+        return $false
+    }
+}
+
+# ── Helper: Refresh PATH from registry ─────────────────────
+function Refresh-Path {
+    $machine = [Environment]::GetEnvironmentVariable("Path", "Machine")
+    $user = [Environment]::GetEnvironmentVariable("Path", "User")
+    $env:Path = "$machine;$user"
+}
+
 # ── Step 2: Check/Install Python ────────────────────────────
 Write-Info "Checking Python..."
 $python = Get-Command python3 -ErrorAction SilentlyContinue
 if (-not $python) { $python = Get-Command python -ErrorAction SilentlyContinue }
 
 if (-not $python) {
-    Write-Warn "Python not found. Attempting to install via winget..."
-    try {
-        winget install --id Python.Python.3.11 --silent --accept-package-agreements 2>&1 | Out-Null
-        # Refresh PATH so python becomes available
-        $env:Path = [Environment]::GetEnvironmentVariable("Path", "User") + ";" + [Environment]::GetEnvironmentVariable("Path", "Machine")
-        Start-Sleep -Seconds 5
+    $installed = Install-WithWinget -Id "Python.Python.3.11" -DisplayName "Python 3.11" -Url "https://python.org/downloads/"
+    if ($installed) {
+        Refresh-Path
+        Start-Sleep -Seconds 3
         $python = Get-Command python -ErrorAction SilentlyContinue
-        if (-not $python) {
-            Write-Err "Python installation failed. Install Python 3.11+ manually from https://python.org"
-            exit 1
-        }
-    } catch {
-        Write-Err "Could not install Python via winget. Install manually from https://python.org"
-        Write-Host "  Then re-run this installer." -ForegroundColor Yellow
-        exit 1
     }
+}
+# Also check common install path directly (winget often puts it here)
+if (-not $python) {
+    $commonPaths = @(
+        "$env:ProgramFiles\Python311\python.exe",
+        "$env:ProgramFiles\Python312\python.exe",
+        "$env:ProgramFiles\Python313\python.exe",
+        "$env:LocalAppData\Programs\Python\Python311\python.exe",
+        "$env:LocalAppData\Programs\Python\Python312\python.exe",
+        "$env:LocalAppData\Programs\Python\Python313\python.exe"
+    )
+    foreach ($p in $commonPaths) {
+        if (Test-Path $p) {
+            $python = Get-Command $p -ErrorAction SilentlyContinue
+            break
+        }
+    }
+}
+if (-not $python) {
+    Write-Err "Python not found! Install Python 3.11+ from https://python.org/downloads/"
+    Write-Host "  Make sure to check 'Add Python to PATH' during installation." -ForegroundColor Yellow
+    Write-Host "  Then re-run this installer." -ForegroundColor Yellow
+    exit 1
 }
 Write-Ok "Python: $($python.Source)"
 
@@ -74,49 +124,49 @@ Write-Ok "Python: $($python.Source)"
 Write-Info "Checking Node.js..."
 $node = Get-Command node -ErrorAction SilentlyContinue
 if (-not $node) {
-    Write-Warn "Node.js not found. Attempting to install via winget..."
-    try {
-        winget install --id OpenJS.NodeJS --silent --accept-package-agreements 2>&1 | Out-Null
-        $env:Path = [Environment]::GetEnvironmentVariable("Path", "User") + ";" + [Environment]::GetEnvironmentVariable("Path", "Machine")
-        Start-Sleep -Seconds 5
+    $installed = Install-WithWinget -Id "OpenJS.NodeJS.LTS" -DisplayName "Node.js LTS" -Url "https://nodejs.org"
+    if ($installed) {
+        Refresh-Path
+        Start-Sleep -Seconds 3
         $node = Get-Command node -ErrorAction SilentlyContinue
-        if (-not $node) {
-            Write-Warn "Node.js install via winget didn't stick. Trying LTS version..."
-            winget install --id OpenJS.NodeJS.LTS --silent --accept-package-agreements 2>&1 | Out-Null
-            $env:Path = [Environment]::GetEnvironmentVariable("Path", "User") + ";" + [Environment]::GetEnvironmentVariable("Path", "Machine")
-            Start-Sleep -Seconds 5
-            $node = Get-Command node -ErrorAction SilentlyContinue
+    }
+}
+if (-not $node) {
+    # Try common install paths
+    $commonNodePaths = @(
+        "$env:ProgramFiles\nodejs\node.exe",
+        "${env:ProgramFiles(x86)}\nodejs\node.exe"
+    )
+    foreach ($p in $commonNodePaths) {
+        if (Test-Path $p) {
+            $node = Get-Command $p -ErrorAction SilentlyContinue
+            break
         }
-    } catch {
-        Write-Warn "Node.js auto-install failed — yt-dlp will use slower Python JS runtime"
-        Write-Warn "Install Node.js manually from https://nodejs.org for better performance"
     }
 }
 if ($node) {
     Write-Ok "Node.js: $($node.Source)"
 } else {
-    Write-Warn "Node.js not found — yt-dlp will be slower without it"
+    Write-Warn "Node.js not found — yt-dlp will use slower Python JS runtime"
+    Write-Warn "Install from https://nodejs.org for better performance"
 }
 
 # ── Step 4: Check/Install ffmpeg ────────────────────────────
 Write-Info "Checking ffmpeg..."
 $ffmpeg = Get-Command ffmpeg -ErrorAction SilentlyContinue
 if (-not $ffmpeg) {
-    Write-Warn "ffmpeg not found. Attempting to install via winget..."
-    try {
-        winget install --id Gyan.FFmpeg --silent --accept-package-agreements 2>&1 | Out-Null
-        $env:Path = [Environment]::GetEnvironmentVariable("Path", "User") + ";" + [Environment]::GetEnvironmentVariable("Path", "Machine")
+    $installed = Install-WithWinget -Id "Gyan.FFmpeg" -DisplayName "ffmpeg" -Url "https://ffmpeg.org/download.html"
+    if ($installed) {
+        Refresh-Path
         Start-Sleep -Seconds 3
         $ffmpeg = Get-Command ffmpeg -ErrorAction SilentlyContinue
-    } catch {
-        Write-Warn "ffmpeg auto-install failed — some yt-dlp formats may not work"
-        Write-Warn "Install ffmpeg manually from https://ffmpeg.org"
     }
 }
 if ($ffmpeg) {
     Write-Ok "ffmpeg: $($ffmpeg.Source)"
 } else {
-    Write-Warn "ffmpeg not found"
+    Write-Warn "ffmpeg not found — some yt-dlp formats may not work"
+    Write-Warn "Install from https://ffmpeg.org/download.html"
 }
 
 # ── Step 5: Install yt-dlp via pip ──────────────────────────
@@ -169,16 +219,21 @@ Write-Info "Installing Python dependencies..."
 & ".venv\Scripts\pip" install yt-dlp --quiet 2>&1 | Out-Null
 Write-Ok "Python dependencies installed"
 
-# ── Step 8: Ensure paths are absolute (Windows quirk) ──────
-Write-Info "Patching app.py for Windows paths..."
-$appPy = Get-Content "app.py" -Raw
-
-# app.py uses shutil.which() which works on Windows if things are on PATH.
-# But we should also make sure the venv's yt-dlp is findable.
-# Replace the last-resort fallback so it tries the venv path first on Windows
-$venvYtdlp = (Resolve-Path ".venv\Scripts\yt-dlp.exe").Path
+# ── Step 8: Verify paths ────────────────────────────────────
+Write-Info "Verifying paths..."
+$venvYtdlp = Join-Path (Get-Location) ".venv\Scripts\yt-dlp.exe"
 if (Test-Path $venvYtdlp) {
-    Write-Ok "Venv yt-dlp found at $venvYtdlp"
+    Write-Ok "Venv yt-dlp: $venvYtdlp"
+} else {
+    # yt-dlp might be yt-dlp.exe or just yt-dlp (pip installs scripts)
+    $venvScripts = Join-Path (Get-Location) ".venv\Scripts"
+    $found = Get-ChildItem "$venvScripts\yt-dlp*" -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($found) {
+        Write-Ok "Venv yt-dlp: $($found.FullName)"
+    } else {
+        Write-Warn "yt-dlp not found in venv — will install it now"
+        & ".venv\Scripts\pip" install yt-dlp --quiet 2>&1 | Out-Null
+    }
 }
 
 Write-Ok "app.py paths are auto-detected (no manual config needed)"
@@ -233,10 +288,15 @@ Set-Content -Path "$InstallDir\start-cloud-dj.bat" -Value $batContent
 Write-Ok "Startup script created: $InstallDir\start-cloud-dj.bat"
 
 # ── Step 12: Start the server ──────────────────────────────
-$existingProcess = Get-Process -Name "python" -ErrorAction SilentlyContinue | Where-Object {
-    $_.CommandLine -like "*app.py*" -or $_.MainWindowTitle -eq ""
-}
-if (-not $existingProcess) {
+# Check if something is already listening on our port
+$portInUse = $false
+try {
+    $listener = [System.Net.Sockets.TcpClient]::new()
+    $listener.ConnectAsync("127.0.0.1", $Port).Wait(1000) | Out-Null
+    $portInUse = $listener.Connected
+    $listener.Close()
+} catch { }
+if (-not $portInUse) {
     Write-Info "Starting Cloud DJ server..."
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = (Resolve-Path ".venv\Scripts\python.exe").Path
