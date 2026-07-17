@@ -219,6 +219,10 @@
                         <span>Videoke Scoring</span>
                         <button class="toggle-switch off" id="scoringToggle" onclick="toggleScoring()"></button>
                     </div>
+                    <div class="toggle-row">
+                        <span>Show Leaderboard</span>
+                        <button class="toggle-switch off" id="lbToggle" onclick="toggleLeaderboard()"></button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -241,6 +245,12 @@
         btn.className = 'toggle-switch ' + (d.scoring ? 'on' : 'off');
     }).catch(() => {});
 
+    // Load leaderboard setting
+    fetch('/admin/settings/leaderboard').then(r=>r.json()).then(d => {
+        const btn = document.getElementById('lbToggle');
+        btn.className = 'toggle-switch ' + (d.show ? 'on' : 'off');
+    }).catch(() => {});
+
     function toggleScoring() {
         const btn = document.getElementById('scoringToggle');
         const newVal = btn.classList.contains('off');
@@ -250,6 +260,18 @@
             body: JSON.stringify({scoring: newVal})
         }).then(r=>r.json()).then(d => {
             btn.className = 'toggle-switch ' + (d.scoring ? 'on' : 'off');
+        });
+    }
+
+    function toggleLeaderboard() {
+        const btn = document.getElementById('lbToggle');
+        const newVal = btn.classList.contains('off');
+        fetch('/admin/settings/leaderboard', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({show: newVal})
+        }).then(r=>r.json()).then(d => {
+            btn.className = 'toggle-switch ' + (d.show ? 'on' : 'off');
         });
     }
 

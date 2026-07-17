@@ -15,6 +15,7 @@ login_manager.login_view = 'login'
 DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database.db')
 NOW_PLAYING = {'id': None, 'url': None, 'title': 'Nothing playing', 'username': '-', 'is_auto_dj': False}
 SCORING_ENABLED = False  # Videoke scoring toggle
+SHOW_LEADERBOARD = False  # Leaderboard visibility toggle
 
 NODE_PATH = '/home/raspberrypi/.local/bin/node'
 YTDLP = '/usr/local/bin/yt-dlp'
@@ -633,9 +634,24 @@ def admin_settings():
         return jsonify({'error': 'Unauthorized'}), 403
     global SCORING_ENABLED
     if request.method == 'POST':
-        SCORING_ENABLED = request.json.get('scoring', False)
+        SCORING_ENABLED = request.json.get('scoring', SCORING_ENABLED)
         return jsonify({'success': True, 'scoring': SCORING_ENABLED})
     return jsonify({'scoring': SCORING_ENABLED})
+
+@app.route('/admin/settings/leaderboard', methods=['GET', 'POST'])
+@login_required
+def admin_settings_leaderboard():
+    if not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized'}), 403
+    global SHOW_LEADERBOARD
+    if request.method == 'POST':
+        SHOW_LEADERBOARD = request.json.get('show', False)
+        return jsonify({'success': True, 'show': SHOW_LEADERBOARD})
+    return jsonify({'show': SHOW_LEADERBOARD})
+
+@app.route('/leaderboard-enabled')
+def leaderboard_enabled():
+    return jsonify({'show': SHOW_LEADERBOARD})
 
 @app.route('/admin/love/<int:item_id>', methods=['POST'])
 @login_required

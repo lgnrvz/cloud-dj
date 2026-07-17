@@ -374,8 +374,9 @@
                 </div>
             </div>
 
+            {% if current_user.is_admin %}
             <!-- Leaderboard -->
-            <div class="card" id="leaderboardCard">
+            <div class="card" id="leaderboardCard" style="display:none;">
                 <div class="card-header" style="border-bottom:1px solid #111122;">
                     <span>Leaderboard</span>
                     <span style="display:flex;align-items:center;gap:6px;">
@@ -387,6 +388,7 @@
                     <div class="empty" style="padding:20px;text-align:center;color:#333;font-size:0.75rem;">No scores yet. Play a song with scoring on!</div>
                 </div>
             </div>
+            {% endif %}
         </div>
     </div>
 
@@ -421,6 +423,7 @@
     const statusText = document.getElementById('playerStatusText');
 
     let currentPlayingId = null;
+    let isAdmin = {% if current_user.is_admin %}true{% else %}false{% endif %};
     let skipInProgress = false;
     let loadingNext = false;
     let lastQueueCount = -1;
@@ -432,7 +435,12 @@
     fetch('/scoring-enabled').then(r=>r.json()).then(d => { scoringOn = d.scoring; }).catch(()=>{});
 
     // Initial leaderboard load
-    refreshLeaderboard();
+    fetch('/leaderboard-enabled').then(r=>r.json()).then(d => {
+        if (d.show && isAdmin) {
+            document.getElementById('leaderboardCard').style.display = '';
+            refreshLeaderboard();
+        }
+    }).catch(() => {});
 
     function setStatus(color, text) {
         statusDot.style.background = color;
@@ -547,7 +555,7 @@
         setStatus('#ffd700', 'Loading next...');
 
         // Show confetti + scoring during the loading gap
-        if (prevPlayingId && prevPlayingId > 0) {
+        if (prevPlayingId && prevPlayingId > 0 && isAdmin) {
             try {
                 const sr = await fetch('/scoring-enabled').then(r => r.json());
                 if (sr.scoring) showVideokeScore();
