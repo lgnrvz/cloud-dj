@@ -348,10 +348,7 @@
                             </div>
                         </div>
                         <div class="actions">
-                            {% if item.user_id == current_user.id %}
                             <button class="love-btn {% if item.loved %}loved{% endif %}" onclick="toggleLove({{ item.id }}, this)">{% if item.loved %}&#9829;{% else %}&#9825;{% endif %}</button>
-                            {% endif %}
-                            <a href="{{ item.clean_url or item.youtube_url }}" target="_blank" class="view-link">View</a>
                         </div>
                     </div>
                     {% endfor %}

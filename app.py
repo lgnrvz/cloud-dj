@@ -262,11 +262,6 @@ def love_toggle(item_id):
     if not item:
         conn.close()
         return jsonify({'error': 'Not found'}), 404
-    # Check ownership or admin love
-    if item['user_id'] != current_user.id and not current_user.is_admin:
-        # Allow loving on history via admin endpoint only
-        conn.close()
-        return jsonify({'error': 'Not your song'}), 403
     # Toggle love
     new_val = 0 if item['loved'] else 1
     conn.execute("UPDATE queue SET loved=? WHERE id=?", (new_val, item_id))
@@ -397,12 +392,6 @@ def auto_advance():
         conn.execute("UPDATE queue SET status='playing' WHERE id=?", (next_item['id'],))
         conn.commit()
         conn.close()
-
-@app.route('/love/<int:item_id>', methods=['POST'])
-@login_required
-def love_toggle_old(item_id):
-    # Route handled by love_toggle above — kept for legacy compatibility
-    return love_toggle(item_id)
 
 @app.route('/loved/add/<int:loved_id>', methods=['POST'])
 @login_required
