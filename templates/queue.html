@@ -168,16 +168,30 @@
             z-index: 10000; display: none; text-align: center;
             pointer-events: none;
         }
+        #scorePopup .score-inner {
+            transform: scale(0.3); opacity: 0;
+            transition: none;
+        }
+        #scorePopup .score-inner.show {
+            animation: scorePop .4s ease-out forwards;
+        }
+        @keyframes scorePop {
+            0% { transform: scale(0.3); opacity: 0; }
+            60% { transform: scale(1.15); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
         #scorePopup .score-num {
-            font-size: 4rem; font-weight: 800; color: #ffd700;
-            text-shadow: 0 0 30px #ffd70044;
+            font-size: 5.5rem; font-weight: 800; color: #ffd700;
+            text-shadow: 0 0 40px #ffd70066, 0 0 80px #ffd70033;
             line-height: 1;
         }
         #scorePopup .score-label {
-            font-size: 0.85rem; color: #888; margin-top: 4px;
+            font-size: 1rem; color: #aaa; margin-top: 6px;
+            letter-spacing: 1px; text-transform: uppercase;
         }
         #scorePopup .score-comment {
-            font-size: 0.75rem; color: #555; margin-top: 2px;
+            font-size: 1.3rem; color: #ffd700; margin-top: 4px;
+            font-weight: 600;
         }
 
         .loved-item { padding: 10px 14px; border-bottom: 1px solid #111122; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
@@ -343,9 +357,11 @@
     <div class="toast" id="toast"></div>
     <canvas id="confettiOverlay"></canvas>
     <div id="scorePopup">
-        <div class="score-num" id="scoreNum">0</div>
-        <div class="score-label">Videoke Score</div>
-        <div class="score-comment" id="scoreComment"></div>
+        <div class="score-inner" id="scoreInner">
+            <div class="score-num" id="scoreNum">0</div>
+            <div class="score-label">Videoke Score</div>
+            <div class="score-comment" id="scoreComment"></div>
+        </div>
     </div>
     <script>
     const toast = document.getElementById('toast');
@@ -522,11 +538,15 @@
         const score = Math.floor(Math.random() * 31) + 70; // 70-100
         const comment = SCORE_COMMENTS[Math.floor(Math.random() * SCORE_COMMENTS.length)];
 
-        // Score popup
+        // Score popup — bigger, centered, scale animation
         const popup = document.getElementById('scorePopup');
+        const inner = document.getElementById('scoreInner');
         document.getElementById('scoreNum').textContent = score;
         document.getElementById('scoreComment').textContent = comment;
         popup.style.display = 'block';
+        inner.classList.remove('show');
+        void inner.offsetHeight;
+        inner.classList.add('show');
 
         // ── Confetti Bomb + Rain ──
         const canvas = document.getElementById('confettiOverlay');
@@ -537,26 +557,26 @@
         const pieces = [];
         const colors = ['#ffd700', '#1db954', '#ff4466', '#4488ff', '#ff8800', '#aa66ff', '#ff66aa', '#66ffaa'];
 
-        // Add bomb burst from bottom center
+        // Bomb burst from bottom center — particles EXPLODE UPWARD
         const cx = canvas.width / 2;
-        const cy = canvas.height + 10;
-        for (let i = 0; i < 200; i++) {
-            const angle = -Math.PI/2 + (Math.random() - 0.5) * Math.PI * 0.9;
-            const speed = Math.random() * 12 + 5;
+        const cy = canvas.height;
+        for (let i = 0; i < 250; i++) {
+            const angle = -Math.PI/2 + (Math.random() - 0.5) * Math.PI * 0.85;
+            const speed = Math.random() * 14 + 6;
             pieces.push({
-                x: cx + (Math.random() - 0.5) * 60,
-                y: cy + (Math.random() - 0.5) * 20,
+                x: cx + (Math.random() - 0.5) * 80,
+                y: cy,
                 w: Math.random() * 8 + 3,
                 h: Math.random() * 6 + 2,
                 color: colors[Math.floor(Math.random() * colors.length)],
                 vx: Math.cos(angle) * speed,
-                vy: -Math.sin(angle) * speed - Math.random() * 4,
+                vy: Math.sin(angle) * speed,  // sin(-π/2) = -1 → goes UP
                 rot: Math.random() * 360,
                 rotSpeed: Math.random() * 8 - 4,
-                gravity: 0.15 + Math.random() * 0.05
+                gravity: 0.12
             });
         }
-        // Add rain particles (fall from top)
+        // Rain from top
         for (let i = 0; i < 150; i++) {
             pieces.push({
                 x: Math.random() * canvas.width,
@@ -564,52 +584,22 @@
                 w: Math.random() * 6 + 2,
                 h: Math.random() * 4 + 2,
                 color: colors[Math.floor(Math.random() * colors.length)],
-                vx: Math.random() * 2 - 1,
+                vx: Math.random() * 1.5 - 0.75,
                 vy: Math.random() * 3 + 2,
                 rot: Math.random() * 360,
                 rotSpeed: Math.random() * 6 - 3,
-                gravity: 0.05
+                gravity: 0.06
             });
         }
 
-        // ── Audience Clapping Sound ──
-        let audioCtx = null;
-        try {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            // Generate applause: layered short noise bursts
-            for (let c = 0; c < 50; c++) {
-                const delay = Math.random() * 3800; // spread over ~4s
-                const duration = 30 + Math.random() * 50;
-                setTimeout(() => {
-                    if (!audioCtx) return;
-                    const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * duration / 1000, audioCtx.sampleRate);
-                    const data = buf.getChannelData(0);
-                    for (let i = 0; i < data.length; i++) {
-                        data[i] = (Math.random() * 2 - 1) * Math.pow(Math.random(), 2);
-                    }
-                    const src = audioCtx.createBufferSource();
-                    src.buffer = buf;
-                    const gain = audioCtx.createGain();
-                    gain.gain.value = 0.03 + Math.random() * 0.04;
-                    const filt = audioCtx.createBiquadFilter();
-                    filt.type = 'lowpass';
-                    filt.frequency.value = 1500 + Math.random() * 2000;
-                    src.connect(filt);
-                    filt.connect(gain);
-                    gain.connect(audioCtx.destination);
-                    src.start();
-                    // Fade out
-                    gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + duration / 1000);
-                }, delay);
-            }
-            // Stop audio after 4.5s
-            setTimeout(() => {
-                if (audioCtx) { audioCtx.close(); audioCtx = null; }
-            }, 4600);
-        } catch(e) {}
+        // ── Audience Clapping (WAV) ──
+        const audio = new Audio('/static/applause.wav');
+        audio.volume = 0.6;
+        audio.play().catch(() => {});
+        setTimeout(() => { audio.pause(); audio.currentTime = 0; }, 4500);
 
-        // ── Animation Loop (4 seconds = ~240 frames) ──
-        const FRAMES = 280;
+        // ── Animation Loop (4.5 seconds) ──
+        const FRAMES = 300;
         let frame = 0;
         function anim() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -622,7 +612,7 @@
                 ctx.save();
                 ctx.translate(p.x, p.y);
                 ctx.rotate(p.rot * Math.PI / 180);
-                ctx.globalAlpha = frame > FRAMES - 40 ? (FRAMES - frame) / 40 : 1;
+                ctx.globalAlpha = frame > FRAMES - 50 ? (FRAMES - frame) / 50 : 1;
                 ctx.fillStyle = p.color;
                 ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
                 ctx.restore();
@@ -633,6 +623,7 @@
             } else {
                 canvas.style.display = 'none';
                 popup.style.display = 'none';
+                inner.classList.remove('show');
             }
         }
         if (confettiAnim) cancelAnimationFrame(confettiAnim);
