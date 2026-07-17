@@ -17,8 +17,22 @@ NOW_PLAYING = {'id': None, 'url': None, 'title': 'Nothing playing', 'username': 
 SCORING_ENABLED = False  # Videoke scoring toggle
 SHOW_LEADERBOARD = False  # Leaderboard visibility toggle
 
-NODE_PATH = '/home/raspberrypi/.local/bin/node'
-YTDLP = '/home/raspberrypi/cloud-dj/.venv/bin/yt-dlp'
+# Auto-detect paths — works on any Linux machine
+import shutil
+NODE_PATH = shutil.which('node') or shutil.which('nodejs') or '/usr/bin/node'
+YTDLP = shutil.which('yt-dlp')
+if not YTDLP:
+    # Fallback: check common install locations
+    for candidate in [
+        os.path.expanduser('~/.local/bin/yt-dlp'),
+        '/usr/local/bin/yt-dlp',
+        '/usr/bin/yt-dlp',
+    ]:
+        if os.path.isfile(candidate):
+            YTDLP = candidate
+            break
+if not YTDLP:
+    YTDLP = 'yt-dlp'  # Last resort: hope it's on PATH
 
 def get_db():
     conn = sqlite3.connect(DB)
