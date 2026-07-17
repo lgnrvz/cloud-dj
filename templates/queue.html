@@ -991,7 +991,7 @@
             const html = await resp.text();
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
-            const newCard = doc.querySelector('.card'); // queue card
+            const newCard = doc.querySelector('.main-col .card');
             const oldCard = document.querySelector('.main-col .card');
             if (newCard && oldCard) {
                 oldCard.outerHTML = newCard.outerHTML;
