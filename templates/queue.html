@@ -530,25 +530,25 @@
         try {
             const resp = await fetch('/now-playing');
             const np = await resp.json();
-            updateNowUi(np.title, np.username);
+            if (typeof updateNowUi === 'function') updateNowUi(np.title, np.username);
 
             const qc = document.getElementById('queueCount');
             if (qc) qc.textContent = (np.queue_count || 0) + ' in queue';
 
             // Auto-refresh queue list when count changes (e.g. another user added)
             if (lastQueueCount !== -1 && lastQueueCount !== np.queue_count) {
-                refreshQueueList();
+                if (typeof refreshQueueList === 'function') refreshQueueList();
             }
             lastQueueCount = np.queue_count;
 
-            if (np.id !== null && np.id !== undefined) {
+            if (np.id !== null && np.id !== undefined && isAdmin) {
                 if (currentPlayingId !== np.id && !loadingNext) {
                     prevPlayingId = null;
                     await loadTrack(np);
                 }
             }
         } catch (e) {
-            setStatus('#444', 'Disconnected');
+            if (isAdmin) setStatus('#444', 'Disconnected');
         }
     }
 
@@ -697,7 +697,6 @@
 
     /** Advance on error too (unavailable video, network failure) */
     video.addEventListener('error', async function() {
-        // Only advance if this was a real track (not initial empty state)
         if (currentPlayingId !== null && currentPlayingId !== undefined) {
             currentPlayingId = null;
             loadingNext = true;
@@ -735,10 +734,24 @@
         skipInProgress = false;
     }
 
-    // Initial load
+    // Start polling
     pollNowPlaying();
     setInterval(pollNowPlaying, 4000);
     {% endif %}
+
+    {# ─── Polling for ALL users (queue updates) ─── #}
+    function safePoll() {
+        fetch('/now-playing').then(r=>r.json()).then(np => {
+            const qc = document.getElementById('queueCount');
+            if (qc) qc.textContent = (np.queue_count || 0) + ' in queue';
+            if (lastQueueCount !== -1 && lastQueueCount !== np.queue_count) {
+                if (typeof refreshQueueList === 'function') refreshQueueList();
+            }
+            lastQueueCount = np.queue_count;
+        }).catch(() => {});
+    }
+    safePoll();
+    setInterval(safePoll, 4000);
 
     // ─── Love Toggle ───
 
