@@ -63,6 +63,14 @@ def init_db():
             conn.execute(f"ALTER TABLE queue ADD COLUMN {col_sql}")
         except sqlite3.OperationalError:
             pass
+    conn.execute("""CREATE TABLE IF NOT EXISTS scores (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        queue_id INTEGER NOT NULL,
+        score INTEGER NOT NULL,
+        title TEXT DEFAULT 'Unknown',
+        username TEXT DEFAULT '-',
+        created_at TEXT DEFAULT (datetime('now'))
+    )""")
     admin = conn.execute("SELECT id FROM users WHERE username='admin'").fetchone()
     if not admin:
         conn.execute("INSERT INTO users (name, username, password, is_admin) VALUES (?, ?, ?, ?)",
@@ -661,6 +669,43 @@ def admin_love(item_id):
     conn.commit()
     conn.close()
     return jsonify({'success': True, 'loved': new_val})
+
+@app.route('/score/save', methods=['POST'])
+@login_required
+def save_score():
+    data = request.get_json()
+    queue_id = data.get('queue_id')
+    score = data.get('score')
+    title = data.get('title', 'Unknown')
+    username = data.get('username', '-')
+    if not queue_id or not score:
+        return jsonify({'error': 'Missing data'}), 400
+    conn = get_db()
+    conn.execute("INSERT INTO scores (queue_id, score, title, username) VALUES (?,?,?,?)",
+                 (queue_id, score, title, username))
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True})
+
+@app.route('/leaderboard')
+def leaderboard():
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT score, title, username, created_at FROM scores ORDER BY score DESC LIMIT 10"
+    ).fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+@app.route('/leaderboard/clear', methods=['POST'])
+@login_required
+def clear_leaderboard():
+    if not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized'}), 403
+    conn = get_db()
+    conn.execute("DELETE FROM scores")
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True})
 
 @app.route('/admin/reorder', methods=['POST'])
 @login_required

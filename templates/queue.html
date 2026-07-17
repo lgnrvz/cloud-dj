@@ -155,6 +155,28 @@
         .empty { text-align: center; padding: 32px; color: #444; font-size: 0.85rem; }
         .empty h2 { font-size: 1.5rem; margin-bottom: 4px; color: #333; }
 
+        .lb-item {
+            display: flex; align-items: center; gap: 8px;
+            padding: 7px 12px; border-bottom: 1px solid #0d0d18;
+            font-size: 0.75rem;
+        }
+        .lb-item:last-child { border-bottom: none; }
+        .lb-rank {
+            width: 20px; text-align: center; font-weight: 700;
+            font-size: 0.85rem; flex-shrink: 0;
+        }
+        .lb-rank.gold { color: #ffd700; }
+        .lb-rank.silver { color: #c0c0c0; }
+        .lb-rank.bronze { color: #cd7f32; }
+        .lb-rank.norm { color: #444; }
+        .lb-info { flex: 1; overflow: hidden; }
+        .lb-info .title { color: #ccc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .lb-info .sub { color: #555; font-size: 0.65rem; }
+        .lb-score {
+            font-weight: 700; font-size: 0.85rem; color: #ffd700;
+            flex-shrink: 0;
+        }
+
         .paste-hint { text-align: center; padding: 12px; color: #333; font-size: 0.75rem; border-bottom: 1px solid #1a1a2e; }
         .paste-hint kbd { background: #1a1a2e; padding: 2px 6px; border-radius: 3px; font-size: 0.7rem; color: #666; border: 1px solid #2a2a3a; }
 
@@ -351,6 +373,20 @@
                     <span id="addStatusText" style="color:#888;">Adding...</span>
                 </div>
             </div>
+
+            <!-- Leaderboard -->
+            <div class="card" id="leaderboardCard">
+                <div class="card-header" style="border-bottom:1px solid #111122;">
+                    <span>Leaderboard</span>
+                    <span style="display:flex;align-items:center;gap:6px;">
+                        <span id="lbCount" style="color:#444;font-size:0.65rem;">0</span>
+                        <button onclick="clearLeaderboard()" style="background:none;border:none;color:#444;cursor:pointer;font-size:0.65rem;font-family:inherit;padding:2px 4px;" title="Clear all scores">&#x2715;</button>
+                    </span>
+                </div>
+                <div id="lbList" style="padding:4px 0;">
+                    <div class="empty" style="padding:20px;text-align:center;color:#333;font-size:0.75rem;">No scores yet. Play a song with scoring on!</div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -394,6 +430,9 @@
 
     // Check if scoring is enabled
     fetch('/scoring-enabled').then(r=>r.json()).then(d => { scoringOn = d.scoring; }).catch(()=>{});
+
+    // Initial leaderboard load
+    refreshLeaderboard();
 
     function setStatus(color, text) {
         statusDot.style.background = color;
@@ -537,6 +576,18 @@
     function showVideokeScore() {
         const score = Math.floor(Math.random() * 31) + 70; // 70-100
         const comment = SCORE_COMMENTS[Math.floor(Math.random() * SCORE_COMMENTS.length)];
+
+        // Save score to leaderboard
+        const qid = prevPlayingId || currentPlayingId;
+        const qtitle = document.querySelector('.now-playing .track')?.textContent || 'Unknown';
+        const quser = document.querySelector('.now-playing .artist')?.textContent || '-';
+        if (qid && qid > 0) {
+            fetch('/score/save', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({queue_id: qid, score: score, title: qtitle, username: quser})
+            }).then(() => refreshLeaderboard()).catch(() => {});
+        }
 
         // Score popup — bigger, centered, scale animation
         const popup = document.getElementById('scorePopup');
@@ -772,6 +823,46 @@
     document.getElementById('pasteInput').addEventListener('keydown', function(e) {
         if (e.key === 'Enter') submitPaste();
     });
+
+    function escapeHtml(t) {
+        const d = document.createElement('div');
+        d.textContent = t;
+        return d.innerHTML;
+    }
+
+    /** Refresh leaderboard from server */
+    async function refreshLeaderboard() {
+        try {
+            const resp = await fetch('/leaderboard');
+            const rows = await resp.json();
+            const list = document.getElementById('lbList');
+            const count = document.getElementById('lbCount');
+            count.textContent = rows.length;
+            if (rows.length === 0) {
+                list.innerHTML = '<div class="empty" style="padding:20px;text-align:center;color:#333;font-size:0.75rem;">No scores yet</div>';
+                return;
+            }
+            list.innerHTML = rows.map((r, i) => {
+                const rank = i + 1;
+                const cls = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : 'norm';
+                return '<div class="lb-item">'
+                    + '<div class="lb-rank ' + cls + '">#' + rank + '</div>'
+                    + '<div class="lb-info">'
+                    + '<div class="title">' + escapeHtml(r.title) + '</div>'
+                    + '<div class="sub">' + escapeHtml(r.username) + ' &middot; ' + (r.created_at || '').substring(0, 10) + '</div>'
+                    + '</div>'
+                    + '<div class="lb-score">' + r.score + '</div>'
+                    + '</div>';
+            }).join('');
+        } catch(e) {}
+    }
+
+    /** Clear leaderboard with confirmation */
+    function clearLeaderboard() {
+        if (!confirm('Clear all leaderboard scores? This cannot be undone.')) return;
+        fetch('/leaderboard/clear', { method: 'POST' })
+            .then(() => refreshLeaderboard());
+    }
 
     /** Re-fetch the loved songs card HTML and swap it in */
     async function refreshLovedSongs() {
