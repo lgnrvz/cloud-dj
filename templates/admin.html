@@ -109,6 +109,33 @@
             color: #444; font-family: inherit; line-height: 1;
         }
         .del-btn:hover { color: #ff4444; }
+
+        .love-btn-sm {
+            background: none; border: none; cursor: pointer;
+            font-size: 0.8rem; padding: 2px 4px; transition: .15s;
+            color: #555; font-family: inherit; line-height: 1;
+        }
+        .love-btn-sm:hover { color: #ff4466; transform: scale(1.2); }
+        .love-btn-sm.loved { color: #ff4466; }
+
+        .toggle-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 0; font-size: 0.8rem; color: #c8c8d0;
+        }
+        .toggle-row:not(:last-child) { border-bottom: 1px solid #111122; }
+        .toggle-switch {
+            width: 36px; height: 20px; border-radius: 10px;
+            border: none; cursor: pointer; position: relative;
+            transition: .2s; font-family: inherit;
+        }
+        .toggle-switch.on { background: #1db954; }
+        .toggle-switch.off { background: #333; }
+        .toggle-switch::after {
+            content: ''; position: absolute; top: 2px; left: 2px;
+            width: 16px; height: 16px; border-radius: 50%;
+            background: #fff; transition: .2s;
+        }
+        .toggle-switch.on::after { left: 18px; }
     </style>
 </head>
 <body>
@@ -152,9 +179,10 @@
                                     <span>{{ item.created_at }}</span>
                                 </div>
                             </div>
-                            <div style="display:flex;align-items:center;gap:4px;">
+                            <div style="display:flex;align-items:center;gap:3px;">
                                 <span class="req-badge">{{ item.request_count }}x</span>
-                                <a href="{{ item.clean_url or item.youtube_url }}" target="_blank" class="view-btn">View</a>
+                                <button class="love-btn-sm {% if item.loved and item.user_id == current_user.id %}loved{% endif %}" onclick="adminLove({{ item.id }}, this)" title="Love">&#9825;</button>
+                                <a href="{{ item.clean_url or item.youtube_url }}" target="_blank" class="view-btn" style="font-size:0.6rem;padding:3px 6px;">View</a>
                                 <button class="del-btn" onclick="deleteHistoryItem({{ item.id }})" title="Delete">&#x2715;</button>
                             </div>
                         </div>
@@ -184,6 +212,14 @@
                         <strong>Users:</strong> {{ users|length }}
                     </div>
                 </div>
+
+                <div class="card" style="margin-top:16px;">
+                    <h2>Settings</h2>
+                    <div class="toggle-row">
+                        <span>Videoke Scoring</span>
+                        <button class="toggle-switch off" id="scoringToggle" onclick="toggleScoring()"></button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -198,6 +234,33 @@
             npMeta.textContent = d.username;
         }).catch(() => {});
     }, 5000);
+
+    // Load scoring setting
+    fetch('/admin/settings').then(r=>r.json()).then(d => {
+        const btn = document.getElementById('scoringToggle');
+        btn.className = 'toggle-switch ' + (d.scoring ? 'on' : 'off');
+    }).catch(() => {});
+
+    function toggleScoring() {
+        const btn = document.getElementById('scoringToggle');
+        const newVal = btn.classList.contains('off');
+        fetch('/admin/settings', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({scoring: newVal})
+        }).then(r=>r.json()).then(d => {
+            btn.className = 'toggle-switch ' + (d.scoring ? 'on' : 'off');
+        });
+    }
+
+    function adminLove(id, btn) {
+        fetch('/admin/love/' + id, { method: 'POST' })
+            .then(r => r.json())
+            .then(d => {
+                if (d.loved) { btn.classList.add('loved'); btn.innerHTML = '&#9829;'; }
+                else { btn.classList.remove('loved'); btn.innerHTML = '&#9825;'; }
+            });
+    }
 
     function clearHistory() {
         if (!confirm('Delete all history? This cannot be undone.')) return;

@@ -158,6 +158,28 @@
         .paste-hint { text-align: center; padding: 12px; color: #333; font-size: 0.75rem; border-bottom: 1px solid #1a1a2e; }
         .paste-hint kbd { background: #1a1a2e; padding: 2px 6px; border-radius: 3px; font-size: 0.7rem; color: #666; border: 1px solid #2a2a3a; }
 
+        /* Confetti overlay */
+        #confettiOverlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 9999; display: none;
+        }
+        #scorePopup {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            z-index: 10000; display: none; text-align: center;
+            pointer-events: none;
+        }
+        #scorePopup .score-num {
+            font-size: 4rem; font-weight: 800; color: #ffd700;
+            text-shadow: 0 0 30px #ffd70044;
+            line-height: 1;
+        }
+        #scorePopup .score-label {
+            font-size: 0.85rem; color: #888; margin-top: 4px;
+        }
+        #scorePopup .score-comment {
+            font-size: 0.75rem; color: #555; margin-top: 2px;
+        }
+
         .loved-item { padding: 10px 14px; border-bottom: 1px solid #111122; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
         .loved-item:last-child { border-bottom: none; }
         .loved-item:hover { background: #111122; }
@@ -263,7 +285,6 @@
             <!-- Queue -->
             <div class="card">
                 <div class="card-header"><span>Queue</span><span>{{ items|length }}</span></div>
-                <div class="paste-hint">Paste a YouTube link <kbd>Ctrl+V</kbd> anywhere to add</div>
                 {% if items|length == 0 %}
                     <div class="empty"><h2>&#9835;</h2><p>Queue is empty</p></div>
                 {% else %}
@@ -311,11 +332,21 @@
             <!-- Quick Add Card -->
             <div class="card paste-card">
                 <input type="text" id="pasteInput" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid #2a2a3a;background:#1a1a2a;color:#e0e0e8;font-family:'Inter',sans-serif;font-size:0.8rem;outline:none;" placeholder="Paste a YouTube link" autocomplete="off">
+                <div id="addStatus" style="display:none;margin-top:6px;font-size:0.7rem;align-items:center;gap:6px;">
+                    <span class="add-spinner" style="width:10px;height:10px;border:1.5px solid #2a2a3a;border-top-color:#1db954;border-radius:50%;display:inline-block;animation:spin .7s linear infinite;"></span>
+                    <span id="addStatusText" style="color:#888;">Adding...</span>
+                </div>
             </div>
         </div>
     </div>
 
     <div class="toast" id="toast"></div>
+    <canvas id="confettiOverlay"></canvas>
+    <div id="scorePopup">
+        <div class="score-num" id="scoreNum">0</div>
+        <div class="score-label">Videoke Score</div>
+        <div class="score-comment" id="scoreComment"></div>
+    </div>
     <script>
     const toast = document.getElementById('toast');
     function showToast(msg, type) {
@@ -341,6 +372,11 @@
     let skipInProgress = false;
     let loadingNext = false;
     let lastQueueCount = -1;
+    let confettiAnim = null;
+    let scoringOn = false;
+
+    // Check if scoring is enabled
+    fetch('/scoring-enabled').then(r=>r.json()).then(d => { scoringOn = d.scoring; }).catch(()=>{});
 
     function setStatus(color, text) {
         statusDot.style.background = color;
@@ -448,6 +484,10 @@
 
     /** Advance when track ends */
     video.addEventListener('ended', async function() {
+        // Show confetti + scoring if enabled and it's a real queue item
+        if (scoringOn && currentPlayingId && currentPlayingId > 0) {
+            showVideokeScore();
+        }
         currentPlayingId = null;
         loadingNext = true;
         setStatus('#ffd700', 'Loading next...');
@@ -462,6 +502,70 @@
         }
         loadingNext = false;
     });
+
+    /** Confetti + score popup (videoke style) */
+    const SCORE_COMMENTS = [
+        'Sobrang galing!', 'Astig!', 'Grabe boses mo!', 'Pwedeng-pwede na!',
+        'Soulful!', 'Perpekto!', 'Solid!', 'Walang katulad!',
+        'Ganda ng boses!', 'Parang professional!', 'Ang galing!', 'Sarap pakinggan!'
+    ];
+
+    function showVideokeScore() {
+        const score = Math.floor(Math.random() * 31) + 70; // 70-100
+        const comment = SCORE_COMMENTS[Math.floor(Math.random() * SCORE_COMMENTS.length)];
+
+        // Score popup
+        const popup = document.getElementById('scorePopup');
+        document.getElementById('scoreNum').textContent = score;
+        document.getElementById('scoreComment').textContent = comment;
+        popup.style.display = '';
+
+        // Confetti
+        const canvas = document.getElementById('confettiOverlay');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        canvas.style.display = '';
+        const ctx = canvas.getContext('2d');
+        const pieces = [];
+        const colors = ['#ffd700', '#1db954', '#ff4466', '#4488ff', '#ff8800', '#aa66ff'];
+        for (let i = 0; i < 120; i++) {
+            pieces.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height - canvas.height,
+                w: Math.random() * 8 + 4,
+                h: Math.random() * 6 + 3,
+                color: colors[Math.floor(Math.random() * colors.length)],
+                speed: Math.random() * 3 + 2,
+                rot: Math.random() * 360,
+                rotSpeed: Math.random() * 6 - 3,
+                drift: Math.random() * 2 - 1
+            });
+        }
+        let frames = 0;
+        function anim() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            pieces.forEach(p => {
+                p.y += p.speed;
+                p.x += p.drift;
+                p.rot += p.rotSpeed;
+                ctx.save();
+                ctx.translate(p.x, p.y);
+                ctx.rotate(p.rot * Math.PI / 180);
+                ctx.fillStyle = p.color;
+                ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
+                ctx.restore();
+            });
+            frames++;
+            if (frames < 120) {
+                confettiAnim = requestAnimationFrame(anim);
+            } else {
+                canvas.style.display = 'none';
+                popup.style.display = 'none';
+            }
+        }
+        if (confettiAnim) cancelAnimationFrame(confettiAnim);
+        anim();
+    }
 
     /** Advance on error too (unavailable video, network failure) */
     video.addEventListener('error', async function() {
@@ -557,11 +661,16 @@
     // Works on all browsers: paste auto-submits, Add button submits, Enter submits
     function submitPaste() {
         const input = document.getElementById('pasteInput');
+        const status = document.getElementById('addStatus');
+        const statusText = document.getElementById('addStatusText');
         const text = input.value.trim();
         if (!text) { showToast('Paste a YouTube link first', 'warn'); return; }
         const ytMatch = text.match(/(https?:\/\/)?(www\.|m\.)?(youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/);
         if (!ytMatch) { showToast('Not a valid YouTube link', 'warn'); return; }
-        showToast('Adding song...', 'warn');
+        // Show inline status
+        status.style.display = 'flex';
+        statusText.textContent = 'Adding...';
+        statusText.style.color = '#888';
         const formData = new FormData();
         formData.append('url', text);
         fetch('/add', {
@@ -570,16 +679,24 @@
             headers: {'X-Requested-With': 'XMLHttpRequest'}
         })
             .then(r => r.json().then(d => ({status: r.status, data: d})))
-            .then(({status, data}) => {
+            .then(({status: respStatus, data}) => {
                 if (data.success) {
-                    showToast('Song added!');
+                    statusText.textContent = 'Added \u2713';
+                    statusText.style.color = '#1db954';
                     input.value = '';
+                    setTimeout(() => { status.style.display = 'none'; }, 2000);
                     refreshQueueList();
                 } else {
-                    showToast(data.error || 'Failed', 'error');
+                    statusText.textContent = data.error || 'Failed';
+                    statusText.style.color = '#ff4444';
+                    setTimeout(() => { status.style.display = 'none'; }, 3000);
                 }
             })
-            .catch(e => { showToast('Failed', 'error'); });
+            .catch(e => {
+                statusText.textContent = 'Failed';
+                statusText.style.color = '#ff4444';
+                setTimeout(() => { status.style.display = 'none'; }, 3000);
+            });
     }
 
     // Auto-submit on paste into the quick-add input

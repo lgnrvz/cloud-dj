@@ -14,6 +14,7 @@ login_manager.login_view = 'login'
 
 DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database.db')
 NOW_PLAYING = {'id': None, 'url': None, 'title': 'Nothing playing', 'username': '-', 'is_auto_dj': False}
+SCORING_ENABLED = False  # Videoke scoring toggle
 
 NODE_PATH = '/home/raspberrypi/.local/bin/node'
 YTDLP = '/usr/local/bin/yt-dlp'
@@ -382,6 +383,10 @@ def add_from_loved(loved_id):
 
     return jsonify({'success': True, 'title': song['title']})
 
+@app.route('/scoring-enabled')
+def scoring_enabled():
+    return jsonify({'scoring': SCORING_ENABLED})
+
 @app.route('/loved/remove/<int:loved_id>', methods=['POST'])
 @login_required
 def remove_loved(loved_id):
@@ -599,6 +604,51 @@ def clear_history():
     conn.commit()
     conn.close()
     return jsonify({'success': True})
+
+@app.route('/admin/settings', methods=['GET', 'POST'])
+@login_required
+def admin_settings():
+    """Get or toggle scoring setting."""
+    if not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized'}), 403
+    global SCORING_ENABLED
+    if request.method == 'POST':
+        SCORING_ENABLED = request.json.get('scoring', False)
+        return jsonify({'success': True, 'scoring': SCORING_ENABLED})
+    return jsonify({'scoring': SCORING_ENABLED})
+
+@app.route('/admin/love/<int:item_id>', methods=['POST'])
+@login_required
+def admin_love(item_id):
+    """Admin can love any history item."""
+    if not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized'}), 403
+    conn = get_db()
+    item = conn.execute("SELECT * FROM queue WHERE id=?", (item_id,)).fetchone()
+    if not item:
+        conn.close()
+        return jsonify({'error': 'Not found'}), 404
+    # Toggle love for the admin user
+    new_val = 0 if (item['loved'] and item['user_id'] == current_user.id) else 1
+    conn.execute("UPDATE queue SET loved=? WHERE id=?", (new_val, item_id))
+    if new_val:
+        existing = conn.execute(
+            "SELECT id FROM loved_songs WHERE user_id=? AND clean_url=?",
+            (current_user.id, item['clean_url'])
+        ).fetchone()
+        if not existing:
+            conn.execute(
+                "INSERT INTO loved_songs (user_id, username, clean_url, title) VALUES (?,?,?,?)",
+                (current_user.id, current_user.username, item['clean_url'], item['title'])
+            )
+    else:
+        conn.execute(
+            "DELETE FROM loved_songs WHERE user_id=? AND clean_url=?",
+            (current_user.id, item['clean_url'])
+        )
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True, 'loved': new_val})
 
 @app.route('/admin/reorder', methods=['POST'])
 @login_required
