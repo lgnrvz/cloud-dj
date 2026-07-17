@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, Response, stream_with_context, session
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-import sqlite3, os, threading, subprocess, re, signal, random, time
+import sqlite3, os, threading, subprocess, re, signal, random, time, sys
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
@@ -17,22 +17,55 @@ NOW_PLAYING = {'id': None, 'url': None, 'title': 'Nothing playing', 'username': 
 SCORING_ENABLED = False  # Videoke scoring toggle
 SHOW_LEADERBOARD = False  # Leaderboard visibility toggle
 
-# Auto-detect paths — works on any Linux machine
+# Auto-detect paths — works on Linux AND Windows
 import shutil
-NODE_PATH = shutil.which('node') or shutil.which('nodejs') or '/usr/bin/node'
-YTDLP = shutil.which('yt-dlp')
+
+# Node.js: check PATH first, then common install locations
+NODE_PATH = shutil.which('node') or shutil.which('nodejs')
+if not NODE_PATH:
+    for candidate in [
+        '/usr/bin/node',
+        '/usr/local/bin/node',
+        'C:\\Program Files\\nodejs\\node.exe',
+        os.path.expandvars('%ProgramFiles%\\nodejs\\node.exe'),
+    ]:
+        if os.path.isfile(candidate):
+            NODE_PATH = candidate
+            break
+if not NODE_PATH:
+    NODE_PATH = 'node'  # hope it's on PATH
+
+# yt-dlp: check venv first (where install.ps1/install.sh put it), then PATH, then common locations
+venv_dir = os.path.dirname(sys.executable)  # e.g., .venv/Scripts/ or .venv/bin/
+YTDLP = None
+
+# 1. Check venv Scripts/bin directory first (most reliable)
+for exe in ['yt-dlp', 'yt-dlp.exe']:
+    candidate = os.path.join(venv_dir, exe)
+    if os.path.isfile(candidate):
+        YTDLP = candidate
+        break
+
+# 2. Check PATH
 if not YTDLP:
-    # Fallback: check common install locations
+    YTDLP = shutil.which('yt-dlp')
+
+# 3. Check common install locations (cross-platform)
+if not YTDLP:
     for candidate in [
         os.path.expanduser('~/.local/bin/yt-dlp'),
         '/usr/local/bin/yt-dlp',
         '/usr/bin/yt-dlp',
+        os.path.expandvars('%LOCALAPPDATA%\\Programs\\Python\\Scripts\\yt-dlp.exe'),
+        os.path.expandvars('%APPDATA%\\Python\\Scripts\\yt-dlp.exe'),
     ]:
         if os.path.isfile(candidate):
             YTDLP = candidate
             break
+
+# 4. Last resort
 if not YTDLP:
-    YTDLP = 'yt-dlp'  # Last resort: hope it's on PATH
+    YTDLP = 'yt-dlp'
 
 def get_db():
     conn = sqlite3.connect(DB)
@@ -102,7 +135,14 @@ def clean_yt_url(url):
     return None
 
 def run_ytdl(args, timeout=20):
-    cmd = [YTDLP, '--js-runtimes', f'node:{NODE_PATH}'] + args
+    """Run yt-dlp with the correct Node.js path.
+    Newer yt-dlp versions auto-detect Node — older ones need --js-runtimes.
+    """
+    base = [YTDLP]
+    # Only add --js-runtimes if NODE_PATH is not just 'node' (auto-detect handles it)
+    if NODE_PATH and NODE_PATH != 'node':
+        base += ['--js-runtimes', f'node:{NODE_PATH}']
+    cmd = base + args
     return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
 
 class User(UserMixin):
@@ -481,11 +521,14 @@ def stream_audio(item_id):
     url = item['clean_url'] or item['youtube_url']
 
     def generate():
+        # Build yt-dlp command (same logic as run_ytdl)
+        ytdl_cmd = [YTDLP]
+        if NODE_PATH and NODE_PATH != 'node':
+            ytdl_cmd += ['--js-runtimes', f'node:{NODE_PATH}']
+        ytdl_cmd += ['-f', 'bestaudio', '-q', '-o', '-', url]
         proc = subprocess.Popen(
-            [YTDLP, '--js-runtimes', f'node:{NODE_PATH}',
-             '-f', 'bestaudio', '-q', '-o', '-', url],
-            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-            preexec_fn=os.setsid
+            ytdl_cmd,
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL
         )
         try:
             while True:
@@ -494,10 +537,7 @@ def stream_audio(item_id):
                     break
                 yield data
         finally:
-            try:
-                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-            except:
-                pass
+            proc.kill()
             proc.wait()
 
     return Response(
@@ -518,9 +558,13 @@ def direct_video():
     if not m:
         return jsonify({'error': 'Invalid URL'}), 400
     try:
+        # Build yt-dlp command (same logic as run_ytdl)
+        ytdl_cmd = [YTDLP]
+        if NODE_PATH and NODE_PATH != 'node':
+            ytdl_cmd += ['--js-runtimes', f'node:{NODE_PATH}']
+        ytdl_cmd += ['-g', '-f', '18', url]
         result = subprocess.run(
-            [YTDLP, '--js-runtimes', f'node:{NODE_PATH}',
-             '-g', '-f', '18', url],
+            ytdl_cmd,
             capture_output=True, text=True, timeout=15
         )
         video_url = result.stdout.strip().split('\n')[0]
