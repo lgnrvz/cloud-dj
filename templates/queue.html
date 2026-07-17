@@ -484,10 +484,13 @@
 
     /** Advance when track ends */
     video.addEventListener('ended', async function() {
-        // Show confetti + scoring if enabled and it's a real queue item
-        if (scoringOn && currentPlayingId && currentPlayingId > 0) {
-            showVideokeScore();
-        }
+        // Check scoring status live (in case admin toggled it mid-song)
+        try {
+            const sr = await fetch('/scoring-enabled').then(r => r.json());
+            if (sr.scoring && currentPlayingId && currentPlayingId > 0) {
+                showVideokeScore();
+            }
+        } catch(e) {}
         currentPlayingId = null;
         loadingNext = true;
         setStatus('#ffd700', 'Loading next...');
@@ -518,13 +521,13 @@
         const popup = document.getElementById('scorePopup');
         document.getElementById('scoreNum').textContent = score;
         document.getElementById('scoreComment').textContent = comment;
-        popup.style.display = '';
+        popup.style.display = 'block';
 
         // Confetti
         const canvas = document.getElementById('confettiOverlay');
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
-        canvas.style.display = '';
+        canvas.style.display = 'block';
         const ctx = canvas.getContext('2d');
         const pieces = [];
         const colors = ['#ffd700', '#1db954', '#ff4466', '#4488ff', '#ff8800', '#aa66ff'];
