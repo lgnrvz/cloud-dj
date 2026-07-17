@@ -450,6 +450,9 @@
     // Check if scoring is enabled
     fetch('/scoring-enabled').then(r=>r.json()).then(d => { scoringOn = d.scoring; }).catch(()=>{});
 
+    // Initial loved songs load (replaces server-rendered with paginated)
+    refreshLovedSongs();
+
     // Initial leaderboard load
     fetch('/leaderboard-enabled').then(r=>r.json()).then(d => {
         if (d.show && isAdmin) {
