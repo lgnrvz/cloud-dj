@@ -430,6 +430,8 @@
     let confettiAnim = null;
     let scoringOn = false;
     let prevPlayingId = null;
+    let currentTrackTitle = '';
+    let currentTrackUser = '';
 
     // Check if scoring is enabled
     fetch('/scoring-enabled').then(r=>r.json()).then(d => { scoringOn = d.scoring; }).catch(()=>{});
@@ -456,6 +458,9 @@
     async function loadTrack(np) {
         // Set ID immediately to prevent poll race (next interval fires at 4s)
         currentPlayingId = np.id;
+        // Save current track info for scoring (used when song ends)
+        currentTrackTitle = np.title || 'Unknown';
+        currentTrackUser = np.username || '-';
 
         if (!np.url || !np.video_id) {
             videoContainer.style.display = 'none';
@@ -587,8 +592,8 @@
 
         // Save score to leaderboard
         const qid = prevPlayingId || currentPlayingId;
-        const qtitle = document.querySelector('.now-playing .track')?.textContent || 'Unknown';
-        const quser = document.querySelector('.now-playing .artist')?.textContent || '-';
+        const qtitle = currentTrackTitle;
+        const quser = currentTrackUser;
         if (qid && qid > 0) {
             fetch('/score/save', {
                 method: 'POST',
@@ -710,6 +715,7 @@
         }
     });
 
+    /** Skip current track */
     async function skipTrack() {
         if (skipInProgress) return;
         skipInProgress = true;
