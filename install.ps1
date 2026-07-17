@@ -22,6 +22,9 @@ $RepoUrl = "https://github.com/lgnrvz/cloud-dj.git"
 $ServiceName = "CloudDJ"
 $AllOk = $true
 
+# Force TLS 1.2 — GitHub and python.org require it
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
 function Write-Info  { Write-Host "[INFO]  $_" -ForegroundColor Cyan }
 function Write-Ok    { Write-Host "[OK]    $_" -ForegroundColor Green }
 function Write-Warn  { Write-Host "[WARN]  $_" -ForegroundColor Yellow }
@@ -66,13 +69,28 @@ function Install-Direct {
     $installer = "$tempDir\$Name-installer.exe"
 
     try {
+        # Force TLS 1.2 one more time (some PowerShell versions reset it)
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
         # Download with progress bar
         Invoke-WebRequest -Uri $Url -OutFile $installer -UseBasicParsing
         Write-Ok "Downloaded $Name ($([math]::Round((Get-Item $installer).Length / 1MB, 1)) MB)"
     } catch {
-        Write-Warn "Download failed: $_"
-        Write-Warn "Please install $Name manually from: $(Split-Path $Url -Parent)"
-        return $false
+        Write-Warn "Direct download failed: $_"
+        # Try via curl.exe if Invoke-WebRequest failed (common on locked-down Windows)
+        if (Get-Command curl -ErrorAction SilentlyContinue) {
+            Write-Info "Retrying with curl.exe..."
+            curl.exe -L -o "$installer" "$Url" 2>&1 | Out-Null
+            if ($LASTEXITCODE -eq 0 -and (Test-Path $installer) -and (Get-Item $installer).Length -gt 1MB) {
+                Write-Ok "Downloaded $Name via curl"
+            } else {
+                Write-Warn "curl download also failed."
+                Write-Warn "Please install $Name manually from: $(Split-Path $Url -Parent)"
+                return $false
+            }
+        } else {
+            Write-Warn "Please install $Name manually from: $(Split-Path $Url -Parent)"
+            return $false
+        }
     }
 
     Write-Info "Installing $Name (silent)..."
