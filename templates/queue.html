@@ -412,6 +412,10 @@
 
     // ─── Browser Player (Admin Only) ───
 
+    // Shared variables (used by safePoll for all users + admin player)
+    let lastQueueCount = -1;
+    let isAdmin = {% if current_user.is_admin %}true{% else %}false{% endif %};
+
     {% if current_user.is_admin %}
     const video = document.getElementById('html5Player');
     const videoContainer = document.getElementById('videoContainer');
@@ -423,10 +427,8 @@
     const statusText = document.getElementById('playerStatusText');
 
     let currentPlayingId = null;
-    let isAdmin = {% if current_user.is_admin %}true{% else %}false{% endif %};
     let skipInProgress = false;
     let loadingNext = false;
-    let lastQueueCount = -1;
     let confettiAnim = null;
     let scoringOn = false;
     let prevPlayingId = null;
