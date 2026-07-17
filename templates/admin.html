@@ -183,6 +183,7 @@
                     <h2>Users</h2>
                     <div style="margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">
                         <span style="color:#444;font-size:0.7rem;" id="usersTotal">0</span>
+                        <button class="clr-btn" onclick="clearUsers()" style="padding:4px 10px;">Clear All</button>
                     </div>
                     <div id="usersList">
                         <div style="padding:16px;text-align:center;color:#333;font-size:0.75rem;">Loading...</div>
@@ -359,7 +360,19 @@
     function deleteHistoryItem(id) {
         if (!confirm('Delete this history entry?')) return;
         fetch('/admin/remove/' + id, { method: 'POST' })
-            .then(() => location.reload());
+            .then(() => loadHistory(curPage));
+    }
+
+    function clearUsers() {
+        if (!confirm('Delete ALL non-admin users? Admins will be kept. This cannot be undone.')) return;
+        fetch('/admin/clear-users', { method: 'POST' })
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) {
+                    loadUsers(1);
+                    document.getElementById('srvUsers').textContent = d.remaining;
+                }
+            });
     }
     </script>
 </body>

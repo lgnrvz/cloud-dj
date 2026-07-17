@@ -778,6 +778,18 @@ def clear_leaderboard():
     conn.close()
     return jsonify({'success': True})
 
+@app.route('/admin/clear-users', methods=['POST'])
+@login_required
+def clear_users():
+    if not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized'}), 403
+    conn = get_db()
+    conn.execute("DELETE FROM users WHERE is_admin=0")
+    conn.commit()
+    remaining = conn.execute("SELECT COUNT(*) as c FROM users").fetchone()['c']
+    conn.close()
+    return jsonify({'success': True, 'remaining': remaining})
+
 @app.route('/admin/reorder', methods=['POST'])
 @login_required
 def reorder():
