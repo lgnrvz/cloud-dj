@@ -528,43 +528,107 @@
         document.getElementById('scoreComment').textContent = comment;
         popup.style.display = 'block';
 
-        // Confetti
+        // ── Confetti Bomb + Rain ──
         const canvas = document.getElementById('confettiOverlay');
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
         canvas.style.display = 'block';
         const ctx = canvas.getContext('2d');
         const pieces = [];
-        const colors = ['#ffd700', '#1db954', '#ff4466', '#4488ff', '#ff8800', '#aa66ff'];
-        for (let i = 0; i < 120; i++) {
+        const colors = ['#ffd700', '#1db954', '#ff4466', '#4488ff', '#ff8800', '#aa66ff', '#ff66aa', '#66ffaa'];
+
+        // Add bomb burst from bottom center
+        const cx = canvas.width / 2;
+        const cy = canvas.height + 10;
+        for (let i = 0; i < 200; i++) {
+            const angle = -Math.PI/2 + (Math.random() - 0.5) * Math.PI * 0.9;
+            const speed = Math.random() * 12 + 5;
             pieces.push({
-                x: Math.random() * canvas.width,
-                y: Math.random() * canvas.height - canvas.height,
-                w: Math.random() * 8 + 4,
-                h: Math.random() * 6 + 3,
+                x: cx + (Math.random() - 0.5) * 60,
+                y: cy + (Math.random() - 0.5) * 20,
+                w: Math.random() * 8 + 3,
+                h: Math.random() * 6 + 2,
                 color: colors[Math.floor(Math.random() * colors.length)],
-                speed: Math.random() * 3 + 2,
+                vx: Math.cos(angle) * speed,
+                vy: -Math.sin(angle) * speed - Math.random() * 4,
                 rot: Math.random() * 360,
-                rotSpeed: Math.random() * 6 - 3,
-                drift: Math.random() * 2 - 1
+                rotSpeed: Math.random() * 8 - 4,
+                gravity: 0.15 + Math.random() * 0.05
             });
         }
-        let frames = 0;
+        // Add rain particles (fall from top)
+        for (let i = 0; i < 150; i++) {
+            pieces.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height * -1,
+                w: Math.random() * 6 + 2,
+                h: Math.random() * 4 + 2,
+                color: colors[Math.floor(Math.random() * colors.length)],
+                vx: Math.random() * 2 - 1,
+                vy: Math.random() * 3 + 2,
+                rot: Math.random() * 360,
+                rotSpeed: Math.random() * 6 - 3,
+                gravity: 0.05
+            });
+        }
+
+        // ── Audience Clapping Sound ──
+        let audioCtx = null;
+        try {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            // Generate applause: layered short noise bursts
+            for (let c = 0; c < 50; c++) {
+                const delay = Math.random() * 3800; // spread over ~4s
+                const duration = 30 + Math.random() * 50;
+                setTimeout(() => {
+                    if (!audioCtx) return;
+                    const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * duration / 1000, audioCtx.sampleRate);
+                    const data = buf.getChannelData(0);
+                    for (let i = 0; i < data.length; i++) {
+                        data[i] = (Math.random() * 2 - 1) * Math.pow(Math.random(), 2);
+                    }
+                    const src = audioCtx.createBufferSource();
+                    src.buffer = buf;
+                    const gain = audioCtx.createGain();
+                    gain.gain.value = 0.03 + Math.random() * 0.04;
+                    const filt = audioCtx.createBiquadFilter();
+                    filt.type = 'lowpass';
+                    filt.frequency.value = 1500 + Math.random() * 2000;
+                    src.connect(filt);
+                    filt.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    src.start();
+                    // Fade out
+                    gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + duration / 1000);
+                }, delay);
+            }
+            // Stop audio after 4.5s
+            setTimeout(() => {
+                if (audioCtx) { audioCtx.close(); audioCtx = null; }
+            }, 4600);
+        } catch(e) {}
+
+        // ── Animation Loop (4 seconds = ~240 frames) ──
+        const FRAMES = 280;
+        let frame = 0;
         function anim() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             pieces.forEach(p => {
-                p.y += p.speed;
-                p.x += p.drift;
+                p.vy += p.gravity;
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vx *= 0.99;
                 p.rot += p.rotSpeed;
                 ctx.save();
                 ctx.translate(p.x, p.y);
                 ctx.rotate(p.rot * Math.PI / 180);
+                ctx.globalAlpha = frame > FRAMES - 40 ? (FRAMES - frame) / 40 : 1;
                 ctx.fillStyle = p.color;
                 ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
                 ctx.restore();
             });
-            frames++;
-            if (frames < 120) {
+            frame++;
+            if (frame < FRAMES) {
                 confettiAnim = requestAnimationFrame(anim);
             } else {
                 canvas.style.display = 'none';
