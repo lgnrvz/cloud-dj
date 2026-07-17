@@ -20,7 +20,7 @@ err()   { echo -e "${RED}[ERROR]${NC} $1"; }
 # ── Config ──────────────────────────────────────────────────
 INSTALL_DIR="${1:-$HOME/cloud-dj}"
 PORT="${PORT:-5050}"
-REPO="https://github.com/racketeer/cloud-dj.git"
+REPO="https://github.com/lgnrvz/cloud-dj.git"
 SERVICE_NAME="cloud-dj"
 
 # ── Banner ──────────────────────────────────────────────────
@@ -106,11 +106,14 @@ fi
 # ── Step 3: Install yt-dlp (if missing) ──────────────────────
 if ! command -v yt-dlp &>/dev/null; then
     info "Installing yt-dlp..."
+    # Try pip3 first (may fail on PEP 668 systems like Raspberry Pi OS)
     if command -v pip3 &>/dev/null; then
-        pip3 install --user yt-dlp
-    else
-        # Fallback: download directly
-        sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp
+        pip3 install --user yt-dlp 2>/dev/null || true
+    fi
+    # If pip3 failed or isn't available, download directly
+    if ! command -v yt-dlp &>/dev/null; then
+        info "pip3 install failed — downloading yt-dlp directly..."
+        sudo curl -#L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp
         sudo chmod a+rx /usr/local/bin/yt-dlp
     fi
     ok "yt-dlp installed"
