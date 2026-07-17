@@ -30,7 +30,33 @@ function Write-Ok    { Write-Host "[OK]    $_" -ForegroundColor Green }
 function Write-Warn  { Write-Host "[WARN]  $_" -ForegroundColor Yellow }
 function Write-Err   { Write-Host "[ERROR] $_" -ForegroundColor Red; $script:AllOk = $false }
 
-# ── Helpers ──────────────────────────────────────────────────
+# Install via winget (preferred — works on locked-down networks)
+function Install-WithWinget {
+    param($Id, $DisplayName)
+
+    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+        Write-Warn "winget not available for $DisplayName"
+        return $false
+    }
+
+    Write-Info "Installing $DisplayName via winget..."
+    winget source update --accept-source-agreements 2>&1 | Out-Null
+
+    $proc = Start-Process -FilePath winget -ArgumentList @(
+        "install", "--id", $Id, "--silent",
+        "--accept-package-agreements", "--accept-source-agreements"
+    ) -NoNewWindow -Wait -PassThru
+
+    if ($proc.ExitCode -eq 0) {
+        Refresh-Path
+        Start-Sleep -Seconds 3
+        Write-Ok "$DisplayName installed via winget"
+        return $true
+    } else {
+        Write-Warn "winget exit code: $($proc.ExitCode) for $DisplayName"
+        return $false
+    }
+}
 
 # Check if a real command exists (NOT the Microsoft Store stub)
 function Test-RealCommand {
@@ -171,19 +197,30 @@ Write-Ok "Windows $($WinVer.Major).$($WinVer.Minor) detected"
 Write-Info "Checking Git..."
 $git = Test-RealCommand "git"
 if (-not $git) {
-    Write-Warn "Git not found — will install it"
-    $installed = Install-Direct -Name "Git" `
-        -Url "https://github.com/git-for-windows/git/releases/download/v2.55.0.windows.3/Git-2.55.0.3-64-bit.exe" `
-        -InstallerArgs "/VERYSILENT /NORESTART /SUPPRESSMSGBOXES" `
-        -ExeName "git" `
-        -FallbackPaths @("$env:ProgramFiles\Git\bin\git.exe", "${env:ProgramFiles(x86)}\Git\bin\git.exe")
-    if (-not $installed) {
-        Write-Err "Git is required. Install from https://git-scm.com/download/win then re-run."
+    Write-Warn "Git not found"
+    # Try winget first (works on most networks)
+    $installed = Install-WithWinget -Id "Git.Git" -DisplayName "Git"
+    if ($installed) { $git = Test-RealCommand "git" }
+    
+    # Fall back to direct download
+    if (-not $git) {
+        Write-Info "Trying direct download..."
+        $installed = Install-Direct -Name "Git" `
+            -Url "https://github.com/git-for-windows/git/releases/download/v2.55.0.windows.3/Git-2.55.0.3-64-bit.exe" `
+            -InstallerArgs "/VERYSILENT /NORESTART /SUPPRESSMSGBOXES" `
+            -ExeName "git" `
+            -FallbackPaths @("$env:ProgramFiles\Git\bin\git.exe", "${env:ProgramFiles(x86)}\Git\bin\git.exe")
+        if ($installed) { $git = Test-RealCommand "git" }
+    }
+    
+    if (-not $git) {
+        Write-Err "Could not install Git automatically."
+        Write-Host "  Install Git manually from: https://git-scm.com/download/win" -ForegroundColor Yellow
+        Write-Host "  Use ALL default options, then re-run this installer." -ForegroundColor Yellow
         pause; exit 1
     }
-    $git = Test-RealCommand "git"
 }
-if ($git) { Write-Ok "Git: $($git.Source)" }
+Write-Ok "Git: $($git.Source)"
 
 # ── Step 3: Install Python ──────────────────────────────────
 Write-Info "Checking Python..."
@@ -191,18 +228,9 @@ $python = Test-RealCommand "python3"
 if (-not $python) { $python = Test-RealCommand "python" }
 
 if (-not $python) {
-    Write-Warn "Python not found (or Microsoft Store stub detected) — will install it"
-    Write-Info "The installer will download Python 3.12 and install it silently."
-    Write-Info "If a UAC prompt appears, click YES."
-
-    $installed = Install-Direct -Name "Python" `
-        -Url "https://www.python.org/ftp/python/3.12.13/python-3.12.13-amd64.exe" `
-        -InstallerArgs "/quiet InstallAllUsers=1 PrependPath=1 Include_test=0" `
-        -ExeName "python" `
-        -FallbackPaths @(
-            "$env:ProgramFiles\Python312\python.exe",
-            "$env:LocalAppData\Programs\Python\Python312\python.exe"
-        )
+    Write-Warn "Python not found (or Microsoft Store stub detected)"
+    # Try winget first (works on most networks)
+    $installed = Install-WithWinget -Id "Python.Python.3.12" -DisplayName "Python 3.12"
     if ($installed) {
         $python = Test-RealCommand "python"
         if (-not $python) {
@@ -211,13 +239,34 @@ if (-not $python) {
             }
         }
     }
+    
+    # Fall back to direct download
+    if (-not $python) {
+        Write-Info "Trying direct download from python.org..."
+        $installed = Install-Direct -Name "Python" `
+            -Url "https://www.python.org/ftp/python/3.12.13/python-3.12.13-amd64.exe" `
+            -InstallerArgs "/quiet InstallAllUsers=1 PrependPath=1 Include_test=0" `
+            -ExeName "python" `
+            -FallbackPaths @(
+                "$env:ProgramFiles\Python312\python.exe",
+                "$env:LocalAppData\Programs\Python\Python312\python.exe"
+            )
+        if ($installed) {
+            $python = Test-RealCommand "python"
+            if (-not $python) {
+                foreach ($p in @("$env:ProgramFiles\Python312\python.exe", "$env:LocalAppData\Programs\Python\Python312\python.exe")) {
+                    if (Test-Path $p) { $python = Get-Command $p; break }
+                }
+            }
+        }
+    }
 }
 
 if (-not $python) {
-    Write-Err "Python installation failed."
-    Write-Host "  Download and install Python 3.12 manually from:" -ForegroundColor Yellow
-    Write-Host "  https://www.python.org/downloads/" -ForegroundColor Yellow
-    Write-Host "  CHECK 'Add Python to PATH' during install, then re-run this installer." -ForegroundColor Yellow
+    Write-Err "Python could not be installed automatically."
+    Write-Host "  Download Python 3.12 from: https://www.python.org/downloads/" -ForegroundColor Yellow
+    Write-Host "  CHECK 'Add Python to PATH' during install." -ForegroundColor Yellow
+    Write-Host "  Then re-run this installer." -ForegroundColor Yellow
     pause; exit 1
 }
 Write-Ok "Python: $($python.Source)"
