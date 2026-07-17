@@ -164,11 +164,6 @@
                     <div style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
                         <span style="color:#444;font-size:0.7rem;" id="histTotal">0 played</span>
                         <div style="display:flex;align-items:center;gap:8px;">
-                            <select id="perPageSelect" onchange="loadHistory(1)" style="background:#1a1a2a;color:#888;border:1px solid #2a2a3a;border-radius:4px;padding:3px 6px;font-size:0.7rem;font-family:inherit;outline:none;">
-                                <option value="10">10</option>
-                                <option value="20" selected>20</option>
-                                <option value="50">50</option>
-                            </select>
                             <button class="clr-btn" onclick="clearHistory()">Clear All</button>
                         </div>
                     </div>
@@ -236,9 +231,8 @@
 
     // Load paginated history
     function loadHistory(page) {
-        const perPage = document.getElementById('perPageSelect').value;
         curPage = page;
-        fetch('/admin/history?page=' + page + '&per_page=' + perPage)
+        fetch('/admin/history?page=' + page + '&per_page=15')
             .then(r => r.json())
             .then(d => {
                 document.getElementById('histTotal').textContent = d.total + ' played';
