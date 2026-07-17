@@ -463,6 +463,23 @@ start /min "" "$venvPython" "app.py"
 Set-Content -Path "$InstallDir\start-cloud-dj.bat" -Value $batContent
 Write-Ok "Startup script: $InstallDir\start-cloud-dj.bat"
 
+# ── Step 12b: Create Desktop shortcut ──────────────────────
+$desktopPath = [Environment]::GetFolderPath('Desktop')
+$shortcutPath = "$desktopPath\Cloud-DJ.lnk"
+try {
+    $wsh = New-Object -ComObject WScript.Shell
+    $shortcut = $wsh.CreateShortcut($shortcutPath)
+    $shortcut.TargetPath = "cmd.exe"
+    $shortcut.Arguments = "/c start /min """" ""$venvPython"" ""$InstallDir\app.py"""
+    $shortcut.WorkingDirectory = "$InstallDir"
+    $shortcut.Description = "Cloud-DJ LAN Music Server"
+    $shortcut.WindowStyle = 7  # Minimized
+    $shortcut.Save()
+    Write-Ok "Desktop shortcut: $shortcutPath"
+} catch {
+    Write-Warn "Could not create desktop shortcut: $_"
+}
+
 # ── Step 13: Start the server ──────────────────────────────
 $portInUse = $false
 try {
