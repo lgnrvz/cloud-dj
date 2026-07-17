@@ -1,6 +1,6 @@
 # Cloud DJ
 
-A self-hosted music queue system where **music plays in the browser**, not on the server. Anyone can add songs via YouTube links, but playback happens on the admin's machine through their web browser with video.
+A self-hosted videoke-style music queue system where **music plays in the browser**, not on the server. Anyone can add songs via YouTube links, but playback happens on the admin's machine through their web browser with video.
 
 Perfect for parties, events, or shared spaces — run it on a Raspberry Pi and let guests queue songs from their phones while the admin's laptop/TV plays the video and audio.
 
@@ -13,26 +13,37 @@ Guest ──paste YouTube link──> Web App ──queue──> yt-dlp stream �
 - **Anyone** can paste YouTube links on the website → songs go to a queue
 - **Admin's browser** is the player — video + audio streams directly to the browser
 - **Auto-DJ** shuffles through previously played songs when the queue is empty
+- **Videoke Scoring** — confetti, applause, and a score (70-100) when a song finishes (admin toggle)
+- **Leaderboard** — top 10 scores ranked #1, #2, #3 with song title and who requested it
 - No audio plays through the Raspberry Pi's speakers
 
 ## Features
 
 ### For Everyone
-- **Paste to add** — Ctrl+V any YouTube link anywhere on the page to queue instantly
+- **Paste to add** — Paste a YouTube link in the input box to queue instantly
 - **♥ Love songs** — Save favorites to a personal list
 - **Auto-DJ** — Plays random songs from history when the queue runs out
 - **10-min limit** — Songs over 10 minutes are blocked
+- **Duplicate prevention** — Same song can't be added twice to the queue
+- **Real-time queue updates** — See new songs appear as others add them
 - **Sign up** — Create your own account to track loved songs
 
 ### For Admins
 - **Browser player** — Video + audio plays in the admin's browser tab
 - **Skip** — Skip current track, automatically plays the next in queue
 - **Queue list** — See all pending songs, who added them
-- **History with request counter** — See how many times each song was played
-- **Clear history** — Wipe the played songs list in one click
-- **Delete history entries** — Remove individual songs from history
+- **History with request counters** — 15 per page with prev/next navigation, love buttons
+- **Clear / delete history** — Clear all or remove individual entries
 - **Manage loved songs** — Remove songs from your loved list
+- **Love from history** — ♥ any played song to add to loved songs
 - **User list** — See all registered users
+
+### Videoke Scoring (Admin Toggle)
+- **Confetti bomb** — 500 particles explode from the bottom, 300 rain from the top
+- **Audience applause** — Real clapping sound effect (4.5s)
+- **Score popup** — Big animated score (70-100) with Filipino comments like "Sobrang galing!"
+- **Leaderboard** — Top 10 scores saved and displayed (admin toggle)
+- Toggle on/off from Admin → Settings
 
 ### Auto-DJ
 When the queue runs out, Auto-DJ automatically shuffles through previously played songs. When someone adds a new song, it transitions into the queue immediately.
@@ -101,7 +112,6 @@ The server runs on **port 5050**.
 |---------|-----|
 | Same machine | http://localhost:5050 |
 | Local network | http://<raspberry-pi-ip>:5050 |
-| Tailscale (remote) | http://<tailscale-ip>:5050 |
 
 ### Default Admin Login
 
@@ -110,17 +120,6 @@ The server runs on **port 5050**.
 | `admin` | `djadmin123` |
 
 **Change the password after first login!**
-
-## Tailscale Remote Access (Recommended)
-
-If your Raspberry Pi is behind NAT (home network), use [Tailscale](https://tailscale.com) for secure remote access:
-
-```bash
-curl -fsSL https://tailscale.com/install.sh | sh
-sudo tailscale up
-```
-
-Then access Cloud DJ at `http://<tailscale-ip>:5050` from anywhere.
 
 ## Run as a Service (systemd)
 
@@ -160,7 +159,7 @@ sudo systemctl start cloud-dj
 |----------|--------|------|-------------|
 | `/` | GET | — | Redirects to queue |
 | `/queue` | GET | Login | Main queue page with player |
-| `/admin` | GET | Admin | Admin panel (history, users) |
+| `/admin` | GET | Admin | Admin panel (history, users, settings) |
 | `/login` | GET/POST | — | User login |
 | `/signup` | GET/POST | — | User registration |
 | `/logout` | GET | Login | Logout |
@@ -168,13 +167,21 @@ sudo systemctl start cloud-dj
 | `/now-playing` | GET | — | Currently playing song (JSON) |
 | `/advance` | POST | Login | Advance to next track |
 | `/skip` | GET | Admin | Skip current track |
-| `/direct-video` | GET | — | Get direct video stream URL |
+| `/direct-video` | GET | — | Get direct video stream URL (format 18) |
 | `/love/<id>` | POST | Login | Toggle love on queue item |
 | `/loved/add/<id>` | POST | Login | Add loved song to queue |
 | `/loved/remove/<id>` | POST | Login | Delete loved song |
+| `/scoring-enabled` | GET | — | Check if videoke scoring is on |
+| `/score/save` | POST | Login | Save a videoke score |
+| `/leaderboard` | GET | — | Top 10 scores (JSON) |
+| `/leaderboard/clear` | POST | Admin | Clear all scores |
+| `/leaderboard-enabled` | GET | — | Check if leaderboard is visible |
+| `/admin/history` | GET | Admin | Paginated history (JSON) |
+| `/admin/love/<id>` | POST | Admin | Love any history item |
+| `/admin/settings` | GET/POST | Admin | Toggle videoke scoring |
+| `/admin/settings/leaderboard` | GET/POST | Admin | Toggle leaderboard visibility |
 | `/admin/remove/<id>` | POST | Admin | Remove queue item |
 | `/admin/clear-history` | POST | Admin | Delete all played history |
-| `/admin/reorder` | POST | Admin | Reorder queue (deprecated) |
 
 ## Project Structure
 
@@ -182,10 +189,12 @@ sudo systemctl start cloud-dj
 cloud-dj/
 ├── app.py                 # Flask application
 ├── requirements.txt       # Python dependencies
+├── static/
+│   └── applause.wav       # Audience clapping sound effect
 ├── templates/
 │   ├── base.html          # Base layout
 │   ├── queue.html         # Main queue page with browser player
-│   ├── admin.html         # Admin panel (history, users)
+│   ├── admin.html         # Admin panel (history, users, settings)
 │   ├── login.html         # Login page
 │   └── signup.html        # Registration page
 ├── .gitignore
