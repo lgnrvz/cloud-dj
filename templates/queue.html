@@ -361,19 +361,7 @@
             <div class="card">
                 <div class="card-header"><span>&#9829; Loved Songs</span><span id="lovedCount">{{ loved|length }}</span></div>
                 <div id="lovedList">
-                {% if loved|length == 0 %}
-                    <div class="empty" style="padding:24px;"><p>&#9825; Click the heart on your songs</p></div>
-                {% else %}
-                    {% for s in loved %}
-                    <div class="loved-item">
-                        <div class="title">{{ s.title }} <span class="meta">{{ s.loved_at[:10] }}</span></div>
-                        <div style="display:flex;gap:4px;align-items:center;">
-                            <button class="add-btn" onclick="addLoved({{ s.id }}, this)">+ Queue</button>
-                            <button class="del-btn" onclick="removeLoved({{ s.id }}, this)" style="background:none;border:none;color:#444;cursor:pointer;font-size:0.8rem;padding:2px 4px;transition:.15s;font-family:inherit;" onmouseover="this.style.color='#ff4444'" onmouseout="this.style.color='#444'">&#x2715;</button>
-                        </div>
-                    </div>
-                    {% endfor %}
-                {% endif %}
+                    <div class="empty" style="padding:24px;"><p>Loading...</p></div>
                 </div>
                 <div id="lovedPages"></div>
             </div>
@@ -449,10 +437,6 @@
 
     // Check if scoring is enabled
     fetch('/scoring-enabled').then(r=>r.json()).then(d => { scoringOn = d.scoring; }).catch(()=>{});
-
-    // Initial loved songs load (replaces server-rendered with paginated)
-    console.log('[loved] calling refreshLovedSongs on page load');
-    refreshLovedSongs().catch(e => console.error('[loved] initial load error:', e));
 
     // Initial leaderboard load
     fetch('/leaderboard-enabled').then(r=>r.json()).then(d => {
@@ -756,6 +740,9 @@
     pollNowPlaying();
     setInterval(pollNowPlaying, 4000);
     {% endif %}
+
+    // Initial loved songs load (all users)
+    refreshLovedSongs();
 
     {# ─── Polling for ALL users (queue updates) ─── #}
     function safePoll() {
