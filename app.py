@@ -18,7 +18,7 @@ SCORING_ENABLED = False  # Videoke scoring toggle
 SHOW_LEADERBOARD = False  # Leaderboard visibility toggle
 
 NODE_PATH = '/home/raspberrypi/.local/bin/node'
-YTDLP = '/usr/local/bin/yt-dlp'
+YTDLP = '/home/raspberrypi/cloud-dj/.venv/bin/yt-dlp'
 
 def get_db():
     conn = sqlite3.connect(DB)
@@ -75,7 +75,7 @@ def init_db():
     admin = conn.execute("SELECT id FROM users WHERE username='admin'").fetchone()
     if not admin:
         conn.execute("INSERT INTO users (name, username, password, is_admin) VALUES (?, ?, ?, ?)",
-                     ('Admin', 'admin', generate_password_hash('djadmin123'), 1))
+                     ('DJ Admin', 'admin', generate_password_hash('djadmin123'), 1))
     conn.commit()
     conn.close()
 
