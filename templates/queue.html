@@ -475,13 +475,6 @@
 
             if (np.id !== null && np.id !== undefined) {
                 if (currentPlayingId !== np.id && !loadingNext) {
-                    // Track changed — show scoring if previous was a real queue item
-                    if (prevPlayingId && prevPlayingId > 0) {
-                        try {
-                            const sr = await fetch('/scoring-enabled').then(r => r.json());
-                            if (sr.scoring) showVideokeScore();
-                        } catch(e) {}
-                    }
                     prevPlayingId = null;
                     await loadTrack(np);
                 }
@@ -497,6 +490,15 @@
         currentPlayingId = null;
         loadingNext = true;
         setStatus('#ffd700', 'Loading next...');
+
+        // Show confetti + scoring during the loading gap
+        if (prevPlayingId && prevPlayingId > 0) {
+            try {
+                const sr = await fetch('/scoring-enabled').then(r => r.json());
+                if (sr.scoring) showVideokeScore();
+            } catch(e) {}
+        }
+
         try {
             const resp = await fetch('/advance', { method: 'POST' });
             const np = await resp.json();

@@ -275,6 +275,18 @@ def add():
         pass
 
     conn = get_db()
+    # Prevent duplicate pending entries
+    dup = conn.execute(
+        "SELECT id FROM queue WHERE clean_url=? AND status='pending'",
+        (clean_url,)
+    ).fetchone()
+    if dup:
+        conn.close()
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'error': 'Already in queue'}), 409
+        flash('Song already in queue!', 'warn')
+        return redirect(url_for('queue'))
+
     existing = conn.execute(
         "SELECT id FROM queue WHERE user_id=? AND clean_url=? AND loved=1",
         (current_user.id, clean_url)
