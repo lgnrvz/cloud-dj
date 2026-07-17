@@ -358,13 +358,6 @@
 
         <!-- Side Column -->
         <div class="side-col">
-            <div class="card">
-                <div class="card-header"><span>&#9829; Loved Songs</span><span id="lovedCount">{{ loved|length }}</span></div>
-                <div id="lovedList">
-                    <div class="empty" style="padding:24px;"><p>Loading...</p></div>
-                </div>
-                <div id="lovedPages"></div>
-            </div>
             <!-- Quick Add Card -->
             <div class="card paste-card">
                 <input type="text" id="pasteInput" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid #2a2a3a;background:#1a1a2a;color:#e0e0e8;font-family:'Inter',sans-serif;font-size:0.8rem;outline:none;" placeholder="Paste a YouTube link" autocomplete="off">
@@ -389,6 +382,15 @@
                 </div>
             </div>
             {% endif %}
+
+            <!-- Loved Songs -->
+            <div class="card">
+                <div class="card-header"><span>&#9829; Loved Songs</span><span id="lovedCount">{{ loved|length }}</span></div>
+                <div id="lovedList">
+                    <div class="empty" style="padding:24px;"><p>Loading...</p></div>
+                </div>
+                <div id="lovedPages"></div>
+            </div>
         </div>
     </div>
 
