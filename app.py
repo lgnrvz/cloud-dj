@@ -229,7 +229,7 @@ def queue():
 def loved_songs():
     """JSON endpoint for paginated loved songs."""
     page = request.args.get('page', 1, type=int)
-    per_page = 10
+    per_page = 7
     offset = (page - 1) * per_page
     conn = get_db()
     total = conn.execute("SELECT COUNT(*) as c FROM loved_songs WHERE user_id=?", (current_user.id,)).fetchone()['c']
