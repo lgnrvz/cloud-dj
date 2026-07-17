@@ -108,6 +108,7 @@ powershell -ExecutionPolicy Bypass -File install.ps1
 - Opens port 5050 in **Windows Firewall**
 - Creates a **Scheduled Task** that starts the server on boot
 - Creates `start-cloud-dj.bat` as a fallback launcher
+- **Adds a Cloud-DJ shortcut to your desktop** 🖥️
 - Starts the server and prints your LAN URL
 
 **Custom port:**
@@ -174,7 +175,7 @@ sudo journalctl -u cloud-dj -f   # follow logs
 
 ### Windows
 ```powershell
-# Start
+# Start (double-click the desktop shortcut or run:)
 .\start-cloud-dj.bat
 
 # Stop: Task Manager → End "Python" process
