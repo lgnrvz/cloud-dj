@@ -18,6 +18,14 @@ NOW_PLAYING = {'id': None, 'url': None, 'title': 'Nothing playing', 'username': 
 SCORING_ENABLED = False  # Videoke scoring toggle
 SHOW_LEADERBOARD = False  # Leaderboard visibility toggle
 
+# Anti-abuse settings
+MAX_CONSECUTIVE_QUEUE = 16  # Max songs a user can add consecutively (1-16)
+_last_adder = {'username': None, 'count': 0}  # Track consecutive adds by same user
+
+# Signup rate limit: track IP -> last signup timestamp (seconds)
+_signup_cooldown = {}  # IP -> timestamp
+SIGNUP_COOLDOWN_SECONDS = 30  # Must wait 30s between signups from same IP
+
 # Auto-detect paths — works on Linux AND Windows
 import shutil
 
@@ -217,6 +225,16 @@ def index():
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
     if request.method == 'POST':
+        ip = request.remote_addr or 'unknown'
+        now = time.time()
+        
+        # Rate limit: check if this IP signed up recently
+        last = _signup_cooldown.get(ip, 0)
+        if now - last < SIGNUP_COOLDOWN_SECONDS:
+            remaining = int(SIGNUP_COOLDOWN_SECONDS - (now - last))
+            flash(f'Too fast! Wait {remaining}s before creating another account.', 'danger')
+            return render_template('signup.html')
+        
         name = request.form['name'].strip()
         username = request.form['username'].strip()
         password = request.form['password']
@@ -228,6 +246,7 @@ def signup():
             conn.execute("INSERT INTO users (name, username, password) VALUES (?,?,?)",
                          (name, username, generate_password_hash(password)))
             conn.commit()
+            _signup_cooldown[ip] = now  # Set cooldown
             flash('Account created! Log in now.', 'success')
             return redirect(url_for('login'))
         except sqlite3.IntegrityError:
@@ -417,6 +436,20 @@ def add():
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify({'error': 'Already added'}), 409
         flash('You already added this song!', 'warn')
+        return redirect(url_for('queue'))
+
+    # Consecutive queue limit: prevent one user from flooding
+    global _last_adder
+    if _last_adder['username'] == current_user.username:
+        _last_adder['count'] += 1
+    else:
+        _last_adder['username'] = current_user.username
+        _last_adder['count'] = 1
+    if _last_adder['count'] > MAX_CONSECUTIVE_QUEUE:
+        _last_adder['count'] = MAX_CONSECUTIVE_QUEUE  # cap it
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'error': f'Someone else add next! Limit is {MAX_CONSECUTIVE_QUEUE} in a row'}), 429
+        flash(f'Someone else add next! Limit is {MAX_CONSECUTIVE_QUEUE} in a row.', 'warn')
         return redirect(url_for('queue'))
 
     ip = request.remote_addr or 'unknown'
@@ -787,6 +820,23 @@ def admin_settings_leaderboard():
         SHOW_LEADERBOARD = request.json.get('show', False)
         return jsonify({'success': True, 'show': SHOW_LEADERBOARD})
     return jsonify({'show': SHOW_LEADERBOARD})
+
+@app.route('/admin/settings/consecutive', methods=['GET', 'POST'])
+@login_required
+def admin_settings_consecutive():
+    """Get or set consecutive queue limit (1-16)."""
+    if not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized'}), 403
+    global MAX_CONSECUTIVE_QUEUE, _last_adder
+    if request.method == 'POST':
+        val = request.json.get('limit', MAX_CONSECUTIVE_QUEUE)
+        if not isinstance(val, int) or val < 1 or val > 16:
+            return jsonify({'error': 'Must be 1-16'}), 400
+        MAX_CONSECUTIVE_QUEUE = val
+        # Reset the counter so the limit applies immediately
+        _last_adder = {'username': None, 'count': 0}
+        return jsonify({'success': True, 'limit': MAX_CONSECUTIVE_QUEUE})
+    return jsonify({'limit': MAX_CONSECUTIVE_QUEUE})
 
 @app.route('/leaderboard-enabled')
 def leaderboard_enabled():
