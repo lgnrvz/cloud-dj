@@ -587,10 +587,16 @@
             setStatus('#444', 'Error loading');
         }
 
-        // Skip button
+        // Skip button — always visible for admin, even during Auto-DJ
         if (skipBtn) {
-            const hideSkip = np.is_auto_dj && (np.queue_count === 0);
-            skipBtn.classList.toggle('hidden', hideSkip);
+            skipBtn.classList.remove('hidden');
+            if (np.is_auto_dj) {
+                skipBtn.textContent = 'Skip';
+                skipBtn.title = 'Pick another random song from history';
+            } else {
+                skipBtn.textContent = 'Skip';
+                skipBtn.title = 'Skip to next track';
+            }
         }
     }
 
