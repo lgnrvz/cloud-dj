@@ -233,6 +233,24 @@
                         </div>
                     </div>
                 </div>
+
+                <div class="card" style="margin-top:16px;">
+                    <h2>Change Password</h2>
+                    <div style="padding:4px 0;">
+                        <form id="passwordForm" onsubmit="changePassword(event)" style="display:flex;flex-direction:column;gap:8px;">
+                            <input type="password" id="currentPass" placeholder="Current password" required
+                                   style="width:100%;padding:8px 10px;border-radius:5px;border:1px solid #2a2a3a;background:#1a1a2a;color:#e0e0e8;font-family:'Inter',sans-serif;font-size:0.8rem;outline:none;">
+                            <input type="password" id="newPass" placeholder="New password" required minlength="4"
+                                   style="width:100%;padding:8px 10px;border-radius:5px;border:1px solid #2a2a3a;background:#1a1a2a;color:#e0e0e8;font-family:'Inter',sans-serif;font-size:0.8rem;outline:none;">
+                            <input type="password" id="confirmPass" placeholder="Confirm new password" required minlength="4"
+                                   style="width:100%;padding:8px 10px;border-radius:5px;border:1px solid #2a2a3a;background:#1a1a2a;color:#e0e0e8;font-family:'Inter',sans-serif;font-size:0.8rem;outline:none;">
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <button type="submit" id="passBtn" style="padding:8px 16px;border-radius:5px;border:none;background:#1db954;color:#000;font-family:'Inter',sans-serif;font-size:0.75rem;font-weight:600;cursor:pointer;">Update Password</button>
+                                <span id="passMsg" style="display:none;font-size:0.7rem;"></span>
+                            </div>
+                        </form>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -447,6 +465,50 @@
                 if (d.success) loadUsers(curUsersPage);
                 else alert(d.error || 'Failed');
             });
+    }
+
+    function changePassword(e) {
+        e.preventDefault();
+        const btn = document.getElementById('passBtn');
+        const msg = document.getElementById('passMsg');
+        const current = document.getElementById('currentPass').value;
+        const newPass = document.getElementById('newPass').value;
+        const confirm = document.getElementById('confirmPass').value;
+        if (!current || !newPass || !confirm) {
+            msg.style.display = 'inline'; msg.style.color = '#ffd700';
+            msg.textContent = 'Fill all fields'; return;
+        }
+        if (newPass !== confirm) {
+            msg.style.display = 'inline'; msg.style.color = '#ffd700';
+            msg.textContent = 'Passwords do not match'; return;
+        }
+        if (newPass.length < 4) {
+            msg.style.display = 'inline'; msg.style.color = '#ffd700';
+            msg.textContent = 'Min 4 characters'; return;
+        }
+        btn.disabled = true; btn.textContent = '...';
+        fetch('/admin/change-password', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({current_password: current, new_password: newPass})
+        }).then(r => r.json()).then(d => {
+            if (d.success) {
+                msg.style.display = 'inline'; msg.style.color = '#1db954';
+                msg.textContent = 'Password updated!';
+                document.getElementById('currentPass').value = '';
+                document.getElementById('newPass').value = '';
+                document.getElementById('confirmPass').value = '';
+            } else {
+                msg.style.display = 'inline'; msg.style.color = '#ff4444';
+                msg.textContent = d.error || 'Failed';
+            }
+        }).catch(() => {
+            msg.style.display = 'inline'; msg.style.color = '#ff4444';
+            msg.textContent = 'Server error';
+        }).finally(() => {
+            btn.disabled = false; btn.textContent = 'Update Password';
+            setTimeout(() => { msg.style.display = 'none'; }, 4000);
+        });
     }
     </script>
 </body>

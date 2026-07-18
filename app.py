@@ -904,6 +904,34 @@ def admin_settings_consecutive():
         return jsonify({'success': True, 'limit': MAX_CONSECUTIVE_QUEUE})
     return jsonify({'limit': MAX_CONSECUTIVE_QUEUE})
 
+@app.route('/admin/change-password', methods=['POST'])
+@login_required
+def admin_change_password():
+    """Change the current admin's password."""
+    if not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data'}), 400
+    current_password = data.get('current_password', '')
+    new_password = data.get('new_password', '')
+    if not current_password or not new_password:
+        return jsonify({'error': 'All fields required'}), 400
+    if len(new_password) < 4:
+        return jsonify({'error': 'Min 4 characters'}), 400
+
+    conn = get_db()
+    user = conn.execute("SELECT * FROM users WHERE id=?", (current_user.id,)).fetchone()
+    if not user or not check_password_hash(user['password'], current_password):
+        conn.close()
+        return jsonify({'error': 'Current password is wrong'}), 403
+
+    conn.execute("UPDATE users SET password=? WHERE id=?",
+                 (generate_password_hash(new_password), current_user.id))
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True})
+
 @app.route('/leaderboard-enabled')
 def leaderboard_enabled():
     return jsonify({'show': SHOW_LEADERBOARD})
