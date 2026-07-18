@@ -472,19 +472,20 @@ def add():
         flash('You already added this song!', 'warn')
         return redirect(url_for('queue'))
 
-    # Consecutive queue limit: prevent one user from flooding
+    # Consecutive queue limit: prevent normal users from flooding (admin is unlimited)
     global _last_adder
-    if _last_adder['username'] == current_user.username:
-        _last_adder['count'] += 1
-    else:
-        _last_adder['username'] = current_user.username
-        _last_adder['count'] = 1
-    if _last_adder['count'] > MAX_CONSECUTIVE_QUEUE:
-        _last_adder['count'] = MAX_CONSECUTIVE_QUEUE  # cap it
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({'error': f'Someone else add next! Limit is {MAX_CONSECUTIVE_QUEUE} in a row'}), 429
-        flash(f'Someone else add next! Limit is {MAX_CONSECUTIVE_QUEUE} in a row.', 'warn')
-        return redirect(url_for('queue'))
+    if not current_user.is_admin:
+        if _last_adder['username'] == current_user.username:
+            _last_adder['count'] += 1
+        else:
+            _last_adder['username'] = current_user.username
+            _last_adder['count'] = 1
+        if _last_adder['count'] > MAX_CONSECUTIVE_QUEUE:
+            _last_adder['count'] = MAX_CONSECUTIVE_QUEUE  # cap it
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'error': f'Someone else add next! Limit is {MAX_CONSECUTIVE_QUEUE} in a row'}), 429
+            flash(f'Someone else add next! Limit is {MAX_CONSECUTIVE_QUEUE} in a row.', 'warn')
+            return redirect(url_for('queue'))
 
     ip = request.remote_addr or 'unknown'
     conn.execute(
