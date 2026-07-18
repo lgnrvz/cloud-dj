@@ -434,13 +434,23 @@ def add():
     try:
         result = run_ytdl(['--print', 'duration', '-s', clean_url], timeout=30)
         dur = result.stdout.strip()
-        if dur and dur.isdigit():
-            d = int(dur)
-            if d > 600:
-                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                    return jsonify({'error': f'Too long! Max 10 min'}), 400
-                flash(f'Too long! Max 10 min (this is {d//60}m{d%60}s).', 'danger')
-                return redirect(url_for('queue'))
+        if not dur:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'error': 'Could not verify video duration'}), 400
+            flash('Could not verify video duration.', 'danger')
+            return redirect(url_for('queue'))
+        try:
+            d = int(float(dur))
+        except (ValueError, TypeError):
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'error': 'Could not parse video duration'}), 400
+            flash('Could not parse video duration.', 'danger')
+            return redirect(url_for('queue'))
+        if d > 600:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'error': f'Too long! Max 10 min'}), 400
+            flash(f'Too long! Max 10 min (this is {d//60}m{d%60}s).', 'danger')
+            return redirect(url_for('queue'))
     except subprocess.TimeoutExpired:
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify({'error': 'Could not verify duration'}), 400
