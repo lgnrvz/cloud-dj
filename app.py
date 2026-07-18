@@ -11,6 +11,7 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=365)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
+login_manager.login_message = ''  # Remove "Please log in to access this page" flash
 
 DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database.db')
 NOW_PLAYING = {'id': None, 'url': None, 'title': 'Nothing playing', 'username': '-', 'is_auto_dj': False}
@@ -276,7 +277,7 @@ def queue():
     # Auto-start: if nothing is playing but there are pending items, advance
     if NOW_PLAYING.get('id') is None:
         _auto_start()
-    return render_template('queue.html', items=items, played=played, loved=loved, loved_urls=loved_urls, now=_enrich_now(dict(NOW_PLAYING)))
+    return render_template('queue.html', items=items, played=played, loved=loved, loved_urls=loved_urls, now=_enrich_now(dict(NOW_PLAYING)), server_url=request.host_url.rstrip('/'))
 
 @app.route('/loved-songs')
 @login_required

@@ -408,6 +408,16 @@
         <div class="side-col">
             <!-- Quick Add Card -->
             <div class="card paste-card">
+                <!-- QR Code -->
+                <div style="text-align:center;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid #1a1a2e;">
+                    <div style="font-size:0.65rem;color:#666;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;">Scan to join</div>
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data={{ server_url }}"
+                         alt="QR Code"
+                         style="width:130px;height:130px;border-radius:8px;background:#fff;padding:4px;cursor:pointer;"
+                         onclick="navigator.clipboard?.writeText('{{ server_url }}')"
+                         title="Click to copy URL">
+                    <div style="font-size:0.65rem;color:#555;margin-top:4px;">{{ server_url }}</div>
+                </div>
                 <input type="text" id="pasteInput" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid #2a2a3a;background:#1a1a2a;color:#e0e0e8;font-family:'Inter',sans-serif;font-size:0.8rem;outline:none;" placeholder="Paste a YouTube link" autocomplete="off">
                 <div id="addStatus" style="display:none;margin-top:6px;font-size:0.7rem;align-items:center;gap:6px;">
                     <span class="add-spinner" style="width:10px;height:10px;border:1.5px solid #2a2a3a;border-top-color:#1db954;border-radius:50%;display:inline-block;animation:spin .7s linear infinite;"></span>
