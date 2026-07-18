@@ -20,7 +20,8 @@ SHOW_LEADERBOARD = False  # Leaderboard visibility toggle
 
 # Anti-abuse settings
 MAX_CONSECUTIVE_QUEUE = 16  # Max songs a user can add consecutively (1-16)
-_last_adder = {'username': None, 'count': 0}  # Track consecutive adds by same user
+_last_adder = {'username': None, 'count': 0, 'last_time': 0}  # Track consecutive adds by same user + timestamp
+QUEUE_LIMIT_RESET_MINUTES = 5  # How long before a blocked user's counter resets
 
 # Auto-DJ: track recent songs to avoid repeating the same ones
 _auto_dj_recent = []  # list of queue IDs recently played by Auto-DJ
@@ -475,17 +476,29 @@ def add():
     # Consecutive queue limit: prevent normal users from flooding (admin is unlimited)
     global _last_adder
     if not current_user.is_admin:
-        if _last_adder['username'] == current_user.username:
+        now = time.time()
+        same_user = _last_adder['username'] == current_user.username
+
+        if same_user:
             _last_adder['count'] += 1
         else:
             _last_adder['username'] = current_user.username
             _last_adder['count'] = 1
+
+        # Check if blocked
         if _last_adder['count'] > MAX_CONSECUTIVE_QUEUE:
             _last_adder['count'] = MAX_CONSECUTIVE_QUEUE  # cap it
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({'error': f'Someone else add next! Limit is {MAX_CONSECUTIVE_QUEUE} in a row'}), 429
-            flash(f'Someone else add next! Limit is {MAX_CONSECUTIVE_QUEUE} in a row.', 'warn')
-            return redirect(url_for('queue'))
+            # If 5 min passed since last successful add, reset and let through
+            if now - _last_adder['last_time'] >= QUEUE_LIMIT_RESET_MINUTES * 60:
+                _last_adder['count'] = 1
+                _last_adder['last_time'] = now  # will be overwritten on real success below
+            else:
+                remaining = QUEUE_LIMIT_RESET_MINUTES * 60 - int(now - _last_adder['last_time'])
+                msg = f'Queue limit! Wait {remaining}s or someone else add next.'
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jsonify({'error': msg}), 429
+                flash(msg, 'warn')
+                return redirect(url_for('queue'))
 
     ip = request.remote_addr or 'unknown'
     conn.execute(
@@ -495,6 +508,10 @@ def add():
     item_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
     conn.commit()
     conn.close()
+
+    # Update last successful add timestamp (for queue limit reset)
+    if not current_user.is_admin:
+        _last_adder['last_time'] = time.time()
 
     # Fetch title in background
     threading.Thread(target=fetch_title, args=(item_id, clean_url), daemon=True).start()
@@ -869,7 +886,7 @@ def admin_settings_consecutive():
             return jsonify({'error': 'Must be 1-16'}), 400
         MAX_CONSECUTIVE_QUEUE = val
         # Reset the counter so the limit applies immediately
-        _last_adder = {'username': None, 'count': 0}
+        _last_adder = {'username': None, 'count': 0, 'last_time': 0}
         return jsonify({'success': True, 'limit': MAX_CONSECUTIVE_QUEUE})
     return jsonify({'limit': MAX_CONSECUTIVE_QUEUE})
 
