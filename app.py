@@ -446,8 +446,12 @@ def add():
             return jsonify({'error': 'Could not verify duration'}), 400
         flash('Could not verify duration - try again.', 'danger')
         return redirect(url_for('queue'))
-    except:
-        pass
+    except Exception as e:
+        print(f'Duration check error: {e}')
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'error': 'Could not verify video'}), 400
+        flash('Could not verify video. Try a different link.', 'danger')
+        return redirect(url_for('queue'))
 
     conn = get_db()
     # Prevent duplicate pending entries
