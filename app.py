@@ -432,7 +432,7 @@ def add():
 
     # Duration check
     try:
-        result = run_ytdl(['--print', 'duration', '-s', clean_url])
+        result = run_ytdl(['--print', 'duration', '-s', clean_url], timeout=30)
         dur = result.stdout.strip()
         if dur and dur.isdigit():
             d = int(dur)
@@ -651,7 +651,7 @@ def direct_video():
         ytdl_cmd += ['-g', '-f', '18', url]
         result = subprocess.run(
             ytdl_cmd,
-            capture_output=True, text=True, timeout=15
+            capture_output=True, text=True, timeout=30
         )
         video_url = result.stdout.strip().split('\n')[0]
         if video_url:

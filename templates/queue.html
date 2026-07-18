@@ -570,13 +570,15 @@
                 video.removeAttribute('src');
                 video.load();
                 setStatus('#ffd700', 'Stream unavailable');
-                // Auto-advance past unavailable streams
-                try {
-                    const resp = await fetch('/advance', { method: 'POST' });
-                    const adel = await resp.json();
-                    updateNowUi(adel.title, adel.username);
-                    await loadTrack(adel);
-                } catch(e) {}
+                // Auto-advance only for Auto-DJ; keep real queue items for skip
+                if (np.is_auto_dj) {
+                    try {
+                        const resp = await fetch('/advance', { method: 'POST' });
+                        const adel = await resp.json();
+                        updateNowUi(adel.title, adel.username);
+                        await loadTrack(adel);
+                    } catch(e) {}
+                }
             }
         } catch (e) {
             videoLoading.classList.remove('show');
@@ -774,19 +776,24 @@
     /** Advance on error too (unavailable video, network failure) */
     video.addEventListener('error', async function() {
         if (currentPlayingId !== null && currentPlayingId !== undefined) {
-            currentPlayingId = null;
-            loadingNext = true;
-            setStatus('#ffd700', 'Skipping unavailable...');
-            try {
-                const resp = await fetch('/advance', { method: 'POST' });
-                const np = await resp.json();
-                updateNowUi(np.title, np.username);
-                await loadTrack(np);
-                refreshQueueList();
-            } catch (e) {
-                setStatus('#444', 'Error advancing');
+            // Only auto-advance for Auto-DJ (id === -1); real queue items keep for skip
+            if (currentPlayingId === -1) {
+                currentPlayingId = null;
+                loadingNext = true;
+                setStatus('#ffd700', 'Skipping unavailable...');
+                try {
+                    const resp = await fetch('/advance', { method: 'POST' });
+                    const np = await resp.json();
+                    updateNowUi(np.title, np.username);
+                    await loadTrack(np);
+                    refreshQueueList();
+                } catch (e) {
+                    setStatus('#444', 'Error advancing');
+                }
+                loadingNext = false;
+            } else {
+                setStatus('#ff4444', 'Playback error — click Skip to move on');
             }
-            loadingNext = false;
         }
     });
 
