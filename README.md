@@ -38,6 +38,7 @@
 - **User management** — view all users, remove troublemakers
 - **Clear history** — wipe played songs (scores are preserved)
 - **Anti-abuse settings** — configure queue limit from the admin panel
+- **Change password** — update admin password from Settings (requires current password)
 
 ---
 
