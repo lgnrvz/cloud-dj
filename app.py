@@ -14,13 +14,17 @@ login_manager.login_view = 'login'
 login_manager.login_message = ''  # Remove "Please log in to access this page" flash
 
 DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database.db')
-NOW_PLAYING = {'id': None, 'url': None, 'title': 'Nothing playing', 'username': '-', 'is_auto_dj': False}
+NOW_PLAYING = {'id': None, 'url': None, 'title': 'Nothing playing', 'username': '-', 'is_auto_dj': False, 'has_history': False}
 SCORING_ENABLED = False  # Videoke scoring toggle
 SHOW_LEADERBOARD = False  # Leaderboard visibility toggle
 
 # Anti-abuse settings
 MAX_CONSECUTIVE_QUEUE = 16  # Max songs a user can add consecutively (1-16)
 _last_adder = {'username': None, 'count': 0}  # Track consecutive adds by same user
+
+# Auto-DJ: track recent songs to avoid repeating the same ones
+_auto_dj_recent = []  # list of queue IDs recently played by Auto-DJ
+MAX_AUTO_DJ_RECENT = 8  # remember last 8 to prevent repeats
 
 # Signup rate limit: track IP -> last signup timestamp (seconds)
 _signup_cooldown = {}  # IP -> timestamp
@@ -186,34 +190,64 @@ def get_next_pending():
 
 def set_now_playing(item):
     """Update NOW_PLAYING from a queue item (dict/Row) or None (-> Auto-DJ from history)."""
-    global NOW_PLAYING
+    global NOW_PLAYING, _auto_dj_recent
     if item is None:
-        # Auto-DJ: shuffle a random previously played song
+        # Auto-DJ: shuffle a random previously played song, but avoid recent repeats
         conn = get_db()
-        played = conn.execute(
-            "SELECT * FROM queue WHERE status='played' ORDER BY RANDOM() LIMIT 1"
-        ).fetchone()
-        conn.close()
-        if played:
-            NOW_PLAYING = {
-                'id': -1,
-                'url': played['clean_url'] or played['youtube_url'],
-                'title': 'Auto-DJ: ' + (played['title'] or 'Unknown'),
-                'username': 'Cloud-DJ',
-                'is_auto_dj': True
-            }
-        else:
+        # Check if there's ANY history at all
+        total_played = conn.execute(
+            "SELECT COUNT(*) as c FROM queue WHERE status='played'"
+        ).fetchone()['c']
+
+        if total_played == 0:
+            conn.close()
             NOW_PLAYING = {
                 'id': None, 'url': None, 'title': 'Nothing playing',
-                'username': '-', 'is_auto_dj': False
+                'username': '-', 'is_auto_dj': False, 'has_history': False
             }
+        else:
+            # Try to find a song NOT in recent history
+            played = None
+            if _auto_dj_recent:
+                placeholders = ','.join('?' * len(_auto_dj_recent))
+                played = conn.execute(
+                    f"SELECT * FROM queue WHERE status='played' AND id NOT IN ({placeholders}) ORDER BY RANDOM() LIMIT 1",
+                    _auto_dj_recent
+                ).fetchone()
+            # Fallback: if all songs have been played recently, just grab any
+            if not played:
+                played = conn.execute(
+                    "SELECT * FROM queue WHERE status='played' ORDER BY RANDOM() LIMIT 1"
+                ).fetchone()
+            conn.close()
+
+            if played:
+                # Track this song to avoid immediate repeat
+                _auto_dj_recent.append(played['id'])
+                if len(_auto_dj_recent) > MAX_AUTO_DJ_RECENT:
+                    _auto_dj_recent.pop(0)
+
+                NOW_PLAYING = {
+                    'id': -1,
+                    'url': played['clean_url'] or played['youtube_url'],
+                    'title': 'Auto-DJ: ' + (played['title'] or 'Unknown'),
+                    'username': 'Cloud-DJ',
+                    'is_auto_dj': True,
+                    'has_history': True
+                }
+            else:
+                NOW_PLAYING = {
+                    'id': None, 'url': None, 'title': 'Nothing playing',
+                    'username': '-', 'is_auto_dj': False, 'has_history': False
+                }
     else:
         NOW_PLAYING = {
             'id': item['id'],
             'url': item['clean_url'] or item['youtube_url'],
             'title': item['title'],
             'username': item['username'],
-            'is_auto_dj': False
+            'is_auto_dj': False,
+            'has_history': True
         }
 
 # ─── ROUTES ───
