@@ -224,11 +224,12 @@
                         <button class="toggle-switch off" id="lbToggle" onclick="toggleLeaderboard()"></button>
                     </div>
                     <div class="toggle-row">
-                        <span style="font-size:0.75rem;">Max Consecutive Queue (1-16)</span>
+                        <span style="font-size:0.75rem;">Queue Limit (1-16)</span>
                         <div style="display:flex;align-items:center;gap:8px;">
                             <input type="number" id="consecutiveLimit" min="1" max="16" value="16"
                                    style="width:50px;padding:4px 6px;border-radius:4px;border:1px solid #2a2a3a;background:#1a1a2a;color:#e0e0e8;font-family:'Inter',sans-serif;font-size:0.75rem;text-align:center;outline:none;">
-                            <button onclick="saveConsecutiveLimit()" style="padding:4px 10px;border-radius:4px;border:1px solid #2a2a3a;background:#1a1a2a;color:#888;font-family:'Inter',sans-serif;font-size:0.65rem;cursor:pointer;">Save</button>
+                            <button id="saveLimitBtn" onclick="saveConsecutiveLimit()" style="padding:4px 10px;border-radius:4px;border:1px solid #2a2a3a;background:#1a1a2a;color:#888;font-family:'Inter',sans-serif;font-size:0.65rem;cursor:pointer;">Save</button>
+                            <span id="limitSaved" style="display:none;font-size:0.65rem;color:#1db954;">Saved</span>
                         </div>
                     </div>
                 </div>
@@ -366,11 +367,17 @@
 
     function saveConsecutiveLimit() {
         const input = document.getElementById('consecutiveLimit');
+        const btn = document.getElementById('saveLimitBtn');
+        const saved = document.getElementById('limitSaved');
         const val = parseInt(input.value);
         if (isNaN(val) || val < 1 || val > 16) {
-            showToast('Must be 1-16', 'warn');
+            saved.textContent = 'Must be 1-16';
+            saved.style.color = '#ffd700';
+            saved.style.display = 'inline';
+            setTimeout(() => { saved.style.display = 'none'; }, 2000);
             return;
         }
+        btn.textContent = '...';
         fetch('/admin/settings/consecutive', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -378,10 +385,24 @@
         }).then(r=>r.json()).then(d => {
             if (d.success) {
                 input.value = d.limit;
-                showToast('Queue limit set to ' + d.limit, '');
+                saved.textContent = 'Limit: ' + d.limit;
+                saved.style.color = '#1db954';
+                saved.style.display = 'inline';
+                btn.textContent = 'Save';
+                setTimeout(() => { saved.style.display = 'none'; }, 3000);
             } else {
-                showToast(d.error || 'Error', 'warn');
+                saved.textContent = d.error || 'Error';
+                saved.style.color = '#ff4444';
+                saved.style.display = 'inline';
+                btn.textContent = 'Save';
+                setTimeout(() => { saved.style.display = 'none'; }, 3000);
             }
+        }).catch(() => {
+            saved.textContent = 'Failed';
+            saved.style.color = '#ff4444';
+            saved.style.display = 'inline';
+            btn.textContent = 'Save';
+            setTimeout(() => { saved.style.display = 'none'; }, 3000);
         });
     }
 
