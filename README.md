@@ -53,6 +53,19 @@
 | **yt-dlp** | Downloads YouTube audio/video streams |
 | **Git** | Cloning the repository |
 
+### Minimum Specs
+
+| Component | Minimum | Recommended |
+|-----------|---------|-------------|
+| **CPU** | 1 core @ 1 GHz | 2 cores @ 1.2 GHz |
+| **RAM** | 256 MB | 512 MB+ |
+| **Storage** | 200 MB | 500 MB |
+| **Network** | Any Wi-Fi / Ethernet | Wired Ethernet preferred |
+| **OS** | Linux (any distro) or Windows 10+ | — |
+
+**Raspberry Pi compatibility:** Pi 3B, 3B+, 4, 400, 5, Zero 2 W — all confirmed working.  
+The server doesn't transcode or stream media — the admin's browser streams directly from YouTube's CDN, so the Pi only handles lightweight web requests and yt-dlp metadata lookups.
+
 ---
 
 ### 🐧 Linux (any distro)
