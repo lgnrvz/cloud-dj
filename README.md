@@ -279,6 +279,16 @@ cloud-dj/
 
 ---
 
+## ☕ Support
+
+Cloud-DJ is free and open source. If you find it useful, consider supporting the project:
+
+[![Patreon](https://img.shields.io/badge/Patreon-NRVZ-ff424d?logo=patreon&logoColor=white)](https://www.patreon.com/c/NRVZ)
+
+Your support helps keep the project maintained and growing.
+
+---
+
 ## 📄 License
 
 [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) — Attribution-NonCommercial 4.0 International
