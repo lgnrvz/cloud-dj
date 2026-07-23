@@ -72,6 +72,17 @@ function Test-RealCommand {
     return $null
 }
 
+# Check if a file is a valid Windows PE executable (starts with MZ)
+function Test-ValidPe {
+    param($Path)
+    if (-not (Test-Path $Path)) { return $false }
+    try {
+        $bytes = [System.IO.File]::ReadAllBytes($Path)
+        if ($bytes.Length -lt 2) { return $false }
+        return ($bytes[0] -eq 0x4D -and $bytes[1] -eq 0x5A)  # "MZ"
+    } catch { return $false }
+}
+
 # Refresh PATH from registry
 function Refresh-Path {
     $machine = [Environment]::GetEnvironmentVariable("Path", "Machine")
@@ -131,6 +142,20 @@ function Install-Direct {
     }
 
     Write-Info "Installing $Name (silent)..."
+    
+    # Verify the downloaded file is a valid Windows executable
+    if (-not (Test-ValidPe $installer)) {
+        Write-Warn "Downloaded file is not a valid executable — retrying with curl.exe..."
+        if (Get-Command curl -ErrorAction SilentlyContinue) {
+            curl.exe -L -o "$installer" "$Url" 2>&1 | Out-Null
+        }
+        if (-not (Test-ValidPe $installer)) {
+            Write-Warn "Downloaded file is still invalid. The URL may have changed or the system architecture may not match."
+            Write-Warn "Please install $Name manually: $(Split-Path $Url -Parent)"
+            return $false
+        }
+        Write-Ok "Downloaded $Name via curl"
+    }
 
     # For Python, make sure we pass install options
     if ($Name -eq "Python") {
