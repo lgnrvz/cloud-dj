@@ -268,7 +268,7 @@ if (-not $python) {
     if (-not $python) {
         Write-Info "Trying direct download from python.org..."
         $installed = Install-Direct -Name "Python" `
-            -Url "https://www.python.org/ftp/python/3.12.13/python-3.12.13-amd64.exe" `
+            -Url "https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe" `
             -InstallerArgs "/quiet InstallAllUsers=1 PrependPath=1 Include_test=0" `
             -ExeName "python" `
             -FallbackPaths @(
