@@ -520,6 +520,7 @@
     async function loadTrack(np) {
         // Set ID immediately to prevent poll race (next interval fires at 4s)
         currentPlayingId = np.id;
+        loadingNext = true;
         // Save current track info for scoring (used when song ends)
         currentTrackTitle = np.title || 'Unknown';
         currentTrackUser = np.username || '-';
@@ -532,6 +533,7 @@
             video.removeAttribute('src');
             video.load();
             setStatus('#444', 'Nothing to play');
+            loadingNext = false;
             return;
         }
 
@@ -546,20 +548,24 @@
             videoLoading.classList.remove('show');
 
             if (d.video_url) {
-                // Set src and start loading — keeps autoplay context since
-                // we don't pause/clear first
-                video.src = d.video_url;
+                // Set event handlers BEFORE setting src
                 video.type = d.mime_type || 'video/mp4';
-                video.load();
+                video.oncanplay = null;
+                video.onerror = null;
 
                 // Wait for enough data to actually play
+                const playReady = new Promise((resolve, reject) => {
+                    video.oncanplay = resolve;
+                    video.onerror = reject;
+                    // Fallback: resolve after 8s even if canplay hasn't fired
+                    setTimeout(resolve, 8000);
+                });
+
+                // Set src — browser auto-loads, no need for video.load()
+                video.src = d.video_url;
+
                 try {
-                    await new Promise((resolve, reject) => {
-                        video.oncanplay = resolve;
-                        video.onerror = reject;
-                        // Fallback: resolve after 8s even if canplay hasn't fired
-                        setTimeout(resolve, 8000);
-                    });
+                    await playReady;
                     await video.play();
                     setStatus('#1db954', 'Playing');
                 } catch (e) {
@@ -602,6 +608,7 @@
                 skipBtn.title = 'Skip to next track';
             }
         }
+        loadingNext = false;
     }
 
     /** Poll now-playing */
