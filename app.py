@@ -669,7 +669,7 @@ def direct_video():
         )
         video_url = result.stdout.strip().split('\n')[0]
         if video_url:
-            return jsonify({'video_url': video_url, 'video_id': m.group(1)})
+            return jsonify({'video_url': video_url, 'video_id': m.group(1), 'mime_type': 'video/mp4'})
     except:
         pass
     return jsonify({'error': 'Failed to get video URL'}), 500

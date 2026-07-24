@@ -366,8 +366,8 @@
                     Loading video...
                 </div>
                 <video id="html5Player" playsinline controls
-                       style="width:100%;display:block;background:#000;"
-                       src=""></video>
+                       preload="auto"
+                       style="width:100%;display:block;background:#000;"></video>
             </div>
             {% endif %}
 
@@ -549,6 +549,7 @@
                 // Set src and start loading — keeps autoplay context since
                 // we don't pause/clear first
                 video.src = d.video_url;
+                video.type = d.mime_type || 'video/mp4';
                 video.load();
 
                 // Wait for enough data to actually play
