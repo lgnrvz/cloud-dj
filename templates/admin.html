@@ -199,7 +199,7 @@
         <div>
             <div class="card">
                 <h2>History</h2>
-                <div style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+                <div style="padding:4px 18px 0;display:flex;justify-content:space-between;align-items:center;">
                     <span style="color:#444;font-size:0.7rem;" id="histTotal">0 played</span>
                     <div style="display:flex;align-items:center;gap:8px;">
                         <button class="clr-btn" onclick="clearHistory()">Clear All</button>
@@ -233,7 +233,7 @@
         <div>
             <div class="card">
                 <h2>Users</h2>
-                <div style="margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">
+                <div style="padding:4px 18px 0;display:flex;justify-content:space-between;align-items:center;">
                     <span style="color:#444;font-size:0.7rem;" id="usersTotal">0</span>
                     <button class="clr-btn" onclick="clearUsers()" style="padding:4px 10px;">Clear All</button>
                 </div>
@@ -249,9 +249,9 @@
 
             <div class="card">
                 <h2>Server</h2>
-                <div class="srv-info">
-                    <strong>Played:</strong> <span id="srvPlayed">{{ history|length }}</span> total<br>
-                    <strong>Users:</strong> <span id="srvUsers">{{ users|length }}</span>
+                <div style="padding:10px 14px;font-size:0.78rem;line-height:1.7;">
+                    <strong style="color:#888;">Played:</strong> <span id="srvPlayed">{{ history|length }}</span> total<br>
+                    <strong style="color:#888;">Users:</strong> <span id="srvUsers">{{ users|length }}</span>
                 </div>
             </div>
 
@@ -266,7 +266,7 @@
                         <span>Leaderboard</span>
                         <button id="lbToggle" class="toggle-switch off" onclick="toggleSetting('leaderboard', this)"></button>
                     </div>
-                    <div class="toggle-row">
+                    <div class="toggle-row" style="border-bottom:none;">
                         <span style="font-size:0.75rem;">Queue Limit (1-16)</span>
                         <div style="display:flex;align-items:center;gap:8px;">
                             <input type="number" id="consecutiveLimit" min="1" max="16" value="16"
@@ -278,9 +278,9 @@
                 </div>
             </div>
 
-            <div class="card" style="margin-top:16px;">
+            <div class="card">
                 <h2>Change Password</h2>
-                <div style="padding:4px 0;">
+                <div style="padding:10px 14px;">
                     <form id="passwordForm" onsubmit="changePassword(event)" style="display:flex;flex-direction:column;gap:8px;">
                         <input type="password" id="currentPass" placeholder="Current password" required
                                style="width:100%;padding:8px 10px;border-radius:5px;border:1px solid #2a2a3a;background:#1a1a2a;color:#e0e0e8;font-family:Inter,sans-serif;font-size:0.8rem;outline:none;">
