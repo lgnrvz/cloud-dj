@@ -496,6 +496,34 @@
     const statusDot = document.getElementById('playerStatusDot');
     const statusText = document.getElementById('playerStatusText');
 
+    // ─── Volume normalization (Web Audio compressor) ───
+    let audioCtx = null;
+    let compressor = null;
+
+    function initAudioNormalizer() {
+        if (audioCtx) return;
+        try {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            compressor = audioCtx.createDynamicsCompressor();
+            compressor.threshold.value = -18;   // dB — start compressing above this
+            compressor.knee.value = 12;         // smooth transition
+            compressor.ratio.value = 6;         // compression ratio
+            compressor.attack.value = 0.003;    // fast attack (3ms)
+            compressor.release.value = 0.25;    // 250ms release
+            compressor.connect(audioCtx.destination);
+            const source = audioCtx.createMediaElementSource(video);
+            source.connect(compressor);
+        } catch(e) {
+            console.warn('[audio] Normalizer unavailable:', e);
+        }
+    }
+
+    // Resume AudioContext on first user interaction (autoplay policy)
+    document.addEventListener('click', () => {
+        initAudioNormalizer();
+        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    }, { once: false });
+
     let currentPlayingId = null;
     let skipInProgress = false;
     let loadingNext = false;
