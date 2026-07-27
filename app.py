@@ -688,7 +688,7 @@ def search_history():
     rows = conn.execute(
         "SELECT q.id, q.title, q.username, q.clean_url FROM queue_fts f "
         "JOIN queue q ON q.id = f.rowid "
-        "WHERE queue_fts MATCH ? AND q.status='played' "
+        "WHERE queue_fts MATCH ? "
         "ORDER BY rank LIMIT 10",
         (f'"{q}"*',)
     ).fetchall()
