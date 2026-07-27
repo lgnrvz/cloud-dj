@@ -23,9 +23,8 @@ MAX_CONSECUTIVE_QUEUE = 16  # Max songs a user can add consecutively (1-16)
 _last_adder = {'username': None, 'count': 0, 'last_time': 0}  # Track consecutive adds by same user + timestamp
 QUEUE_LIMIT_RESET_MINUTES = 5  # How long before a blocked user's counter resets
 
-# Auto-DJ: track recent songs to avoid repeating the same ones
-_auto_dj_recent = []  # list of queue IDs recently played by Auto-DJ
-MAX_AUTO_DJ_RECENT = 8  # remember last 8 to prevent repeats
+# Auto-DJ: track which history songs have been played this round (no repeats until all done)
+_auto_dj_round_played = set()  # set of queue IDs played in the current round
 
 # Signup rate limit: track IP -> last signup timestamp (seconds)
 _signup_cooldown = {}  # IP -> timestamp
@@ -218,9 +217,9 @@ def get_next_pending():
 
 def set_now_playing(item):
     """Update NOW_PLAYING from a queue item (dict/Row) or None (-> Auto-DJ from history)."""
-    global NOW_PLAYING, _auto_dj_recent
+    global NOW_PLAYING, _auto_dj_round_played
     if item is None:
-        # Auto-DJ: shuffle a random previously played song, but avoid recent repeats
+        # Auto-DJ: shuffle a random previously played song, no repeats until all are played
         conn = get_db()
         # Check if there's ANY history at all
         total_played = conn.execute(
@@ -234,15 +233,19 @@ def set_now_playing(item):
                 'username': '-', 'is_auto_dj': False, 'has_history': False
             }
         else:
-            # Try to find a song NOT in recent history
+            # If we've played everything in the current round, reset
+            if len(_auto_dj_round_played) >= total_played:
+                _auto_dj_round_played.clear()
+
+            # Pick a random song NOT yet played this round
             played = None
-            if _auto_dj_recent:
-                placeholders = ','.join('?' * len(_auto_dj_recent))
+            if _auto_dj_round_played:
+                placeholders = ','.join('?' * len(_auto_dj_round_played))
                 played = conn.execute(
                     f"SELECT * FROM queue WHERE status='played' AND id NOT IN ({placeholders}) ORDER BY RANDOM() LIMIT 1",
-                    _auto_dj_recent
+                    list(_auto_dj_round_played)
                 ).fetchone()
-            # Fallback: if all songs have been played recently, just grab any
+            # Fallback: if somehow all are in the set (shouldn't happen after reset), grab any
             if not played:
                 played = conn.execute(
                     "SELECT * FROM queue WHERE status='played' ORDER BY RANDOM() LIMIT 1"
@@ -250,10 +253,8 @@ def set_now_playing(item):
             conn.close()
 
             if played:
-                # Track this song to avoid immediate repeat
-                _auto_dj_recent.append(played['id'])
-                if len(_auto_dj_recent) > MAX_AUTO_DJ_RECENT:
-                    _auto_dj_recent.pop(0)
+                # Track this song for the current round
+                _auto_dj_round_played.add(played['id'])
 
                 NOW_PLAYING = {
                     'id': -1,
