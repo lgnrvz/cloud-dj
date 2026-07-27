@@ -732,8 +732,8 @@ def replay_from_history(item_id):
         conn.close()
         return jsonify({'error': 'Not found'}), 404
     existing = conn.execute(
-        "SELECT id FROM queue WHERE user_id=? AND clean_url=? AND status != 'played'",
-        (current_user.id, item['clean_url'])
+        "SELECT id FROM queue WHERE clean_url=? AND status != 'played'",
+        (item['clean_url'],)
     ).fetchone()
     if existing:
         conn.close()
