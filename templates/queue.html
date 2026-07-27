@@ -163,13 +163,22 @@
             padding: 12px 18px;
             border-bottom: 1px solid #111122;
             display: flex;
-            justify-content: space-between;
             align-items: center;
+            gap: 8px;
             transition: .15s;
+            cursor: default;
         }
         .queue-item:last-child { border-bottom: none; }
         .queue-item:hover { background: #111122; }
         .queue-item.playing { background: #1db95408; border-left: 3px solid #1db954; }
+        .queue-item.dragging { opacity: 0.4; }
+        .queue-item.drag-over { border-top: 2px solid #1db954; }
+        .drag-handle {
+            cursor: grab; color: #333; font-size: 0.85rem; padding: 2px 4px;
+            user-select: none; flex-shrink: 0; transition: .15s; display: none;
+        }
+        .drag-handle:hover { color: #888; }
+        .queue-item:hover .drag-handle { display: inline-block; }
         .queue-item .info { flex: 1; min-width: 0; }
         .queue-item .title { font-weight: 600; color: #e0e0e8; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .queue-item .sub { font-size: 0.75rem; color: #555; margin-top: 3px; }
@@ -385,7 +394,8 @@
                     <div class="empty"><h2>&#9835;</h2><p>Queue is empty</p></div>
                 {% else %}
                     {% for item in items %}
-                    <div class="queue-item {% if item.status == 'playing' %}playing{% endif %}">
+                    <div class="queue-item {% if item.status == 'playing' %}playing{% endif %}" draggable="true" data-id="{{ item.id }}">
+                        {% if current_user.is_admin %}<span class="drag-handle">⠿</span>{% endif %}
                         <div class="info">
                             <div class="title">{{ item.title or 'Loading...' }}</div>
                             <div class="sub">
@@ -841,6 +851,54 @@
             btn.textContent = 'Show';
         }
     }
+
+    /** Drag-and-drop queue reorder (admin only) */
+    let dragSrc = null;
+    document.addEventListener('dragstart', e => {
+        const item = e.target.closest('.queue-item');
+        if (!item) return;
+        dragSrc = item;
+        item.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+    });
+    document.addEventListener('dragend', e => {
+        const item = e.target.closest('.queue-item');
+        if (item) item.classList.remove('dragging');
+        document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+    });
+    document.addEventListener('dragover', e => {
+        const item = e.target.closest('.queue-item');
+        if (!item || item === dragSrc) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        const rect = item.getBoundingClientRect();
+        const mid = rect.top + rect.height / 2;
+        if (e.clientY < mid) item.classList.add('drag-over');
+        else item.classList.remove('drag-over');
+    });
+    document.addEventListener('dragleave', e => {
+        const item = e.target.closest('.queue-item');
+        if (item) item.classList.remove('drag-over');
+    });
+    document.addEventListener('drop', e => {
+        e.preventDefault();
+        const target = e.target.closest('.queue-item');
+        if (!target || target === dragSrc || !dragSrc) return;
+        target.classList.remove('drag-over');
+        const parent = target.parentNode;
+        const rect = target.getBoundingClientRect();
+        const mid = rect.top + rect.height / 2;
+        if (e.clientY < mid) parent.insertBefore(dragSrc, target);
+        else parent.insertBefore(dragSrc, target.nextSibling);
+        dragSrc = null;
+        // Save new order
+        const ids = [...document.querySelectorAll('.queue-item')].filter(el => !el.classList.contains('playing')).map(el => parseInt(el.dataset.id));
+        fetch('/admin/reorder', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({order: ids})
+        }).catch(() => {});
+    });
     {% endif %}
 
     // Loved songs pagination state (must be before refreshLovedSongs call)
