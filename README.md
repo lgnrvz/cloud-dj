@@ -20,12 +20,19 @@
 - **Queue Limit** — prevents one person from flooding (configurable 1–16, auto-resets after 5 min)
 - **Admin is unlimited** — queue limit doesn't apply to admin accounts
 - **Signup rate limiting** — blocks rapid account creation from the same IP
+- **Drag-and-drop reorder** — admin can reorder the queue by dragging (desktop only)
 
 ### ▶️ Auto-DJ
 - **Auto-fill** — when the queue is empty, shuffles through previously played songs
 - **Skip** — click Skip to jump to a new random track (no repeats of the last 8)
-- **Seamless transition** — when someone adds a new song, Auto-DJ hands off to the real queue
+- **Seamless transition** — when someone adds a new song, Auto-DJ finishes the current track first before handing off
 - **No history yet?** Skip button is hidden until there's something to shuffle
+- **Volume normalization** — automatic loudness smoothing via Web Audio DynamicsCompressor
+
+### 🔍 Search & Replay
+- **History search** — FTS5-powered search with typeahead suggestions as you type
+- **Replay** — click any search result to re-queue it instantly
+- **Global dedup** — search deduplicates by video URL, not just title
 
 ### 🎤 Scoring & Leaderboard
 - **Videoke mode** — confetti explosion + applause + score popup (70–100) when a song finishes
@@ -37,6 +44,10 @@
 - **Skip / reorder / remove** — full queue control
 - **User management** — view all users, remove troublemakers
 - **Clear history** — wipe played songs (scores are preserved)
+- **Import / Export** — bulk-import YouTube links via `.csv` or `.txt` files; export all links for backup
+- **Background title resolution** — imported songs get their YouTube titles resolved automatically in the background with rate limiting and a live progress bar
+- **# comment support** — annotate import `.txt` files with `#` comments (e.g., `https://youtube.com/... # Song Title`)
+- **Export format** — exports as `url #title` — ready to re-import
 - **Anti-abuse settings** — configure queue limit from the admin panel
 - **Change password** — update admin password from Settings (requires current password)
 
@@ -272,10 +283,17 @@ cloud-dj/
 | `/admin/clear-history` | POST | Admin | Delete all played songs |
 | `/admin/remove-user/<id>` | POST | Admin | Delete a user |
 | `/admin/clear-users` | POST | Admin | Delete all non-admin users |
-| `/admin/reorder` | POST | Admin | Reorder queue |
+| `/admin/reorder` | POST | Admin | Reorder queue (drag-and-drop) |
 | `/admin/settings` | GET/POST | Admin | Toggle scoring |
 | `/admin/settings/leaderboard` | GET/POST | Admin | Toggle leaderboard |
-| `/admin/settings/consecutive` | GET/POST | Admin | Queue limit (1–16) |
+| `/admin/settings/queue-limit` | GET/POST | Admin | Queue limit (1–16) |
+| `/admin/export-csv` | GET | Admin | Export all links as `.txt` (`url #title`) |
+| `/admin/import-csv` | POST | Admin | Import links from `.csv`/`.txt` file |
+| `/admin/import-progress/<id>` | GET | Admin | Poll background title resolution progress |
+| `/admin/change-password` | POST | Admin | Update admin password |
+| `/move/<id>` | POST | Admin | Move item in queue (priority-based) |
+| `/search` | GET | Login | FTS5 search suggestions (JSON) |
+| `/replay/<id>` | POST | Login | Re-queue a played song from search/history |
 
 ---
 
