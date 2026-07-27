@@ -1121,9 +1121,12 @@ def export_csv():
     if not current_user.is_admin:
         return jsonify({'error': 'Unauthorized'}), 403
     conn = get_db()
-    rows = conn.execute("SELECT clean_url, youtube_url FROM queue ORDER BY id DESC").fetchall()
+    rows = conn.execute("SELECT clean_url, youtube_url, title FROM queue ORDER BY id DESC").fetchall()
     conn.close()
-    out = '\n'.join(r['clean_url'] or r['youtube_url'] or '' for r in rows)
+    out = '\n'.join(
+        (r['clean_url'] or r['youtube_url'] or '') + ' #' + (r['title'] or '')
+        for r in rows
+    )
     return Response(out, mimetype='text/plain', headers={'Content-Disposition': 'attachment; filename=cloud-dj-links.txt'})
 
 # ─── IMPORT JOB TRACKER ───
