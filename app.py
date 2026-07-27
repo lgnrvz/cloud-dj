@@ -1141,34 +1141,60 @@ def import_csv():
         return jsonify({'error': 'No file uploaded'}), 400
     import csv, io
     content = csv_file.read().decode('utf-8')
-    reader = csv.DictReader(io.StringIO(content))
+    lines = content.strip().split('\n')
     conn = get_db()
     added = 0
     errors = 0
-    for row in reader:
-        raw_url = (row.get('url') or row.get('clean_url') or row.get('youtube_url') or '').strip()
-        if not raw_url:
-            errors += 1
-            continue
-        title = (row.get('title') or 'Imported').strip()
-        # Normalize URL
-        m = re.search(r'(?:v=|/)([\w-]{11})(?:\?|&|$)', raw_url)
-        if not m:
-            errors += 1
-            continue
-        clean = 'https://www.youtube.com/watch?v=' + m.group(1)
-        existing = conn.execute(
-            "SELECT id FROM queue WHERE clean_url=? AND status != 'played'",
-            (clean,)
-        ).fetchone()
-        if existing:
-            errors += 1
-            continue
-        conn.execute(
-            "INSERT INTO queue (user_id, username, youtube_url, clean_url, title, ip_address) VALUES (?,?,?,?,?,?)",
-            (current_user.id, current_user.username, clean, clean, title, 'import')
-        )
-        added += 1
+    # Detect format: if first line looks like a header (contains url/title), use DictReader
+    first = lines[0].strip().lower() if lines else ''
+    if 'url' in first or 'title' in first or 'youtube' in first:
+        reader = csv.DictReader(io.StringIO(content))
+        for row in reader:
+            raw_url = (row.get('url') or row.get('clean_url') or row.get('youtube_url') or '').strip()
+            title = (row.get('title') or 'Imported').strip()
+            if not raw_url:
+                errors += 1
+                continue
+            m = re.search(r'(?:v=|/)([\w-]{11})(?:\?|&|$)', raw_url.strip())
+            if not m:
+                errors += 1
+                continue
+            clean = 'https://www.youtube.com/watch?v=' + m.group(1)
+            existing = conn.execute(
+                "SELECT id FROM queue WHERE clean_url=? AND status != 'played'",
+                (clean,)
+            ).fetchone()
+            if existing:
+                errors += 1
+                continue
+            conn.execute(
+                "INSERT INTO queue (user_id, username, youtube_url, clean_url, title, ip_address) VALUES (?,?,?,?,?,?)",
+                (current_user.id, current_user.username, clean, clean, title, 'import')
+            )
+            added += 1
+    else:
+        # Plain text: one YouTube URL per line
+        for line in lines:
+            raw_url = line.strip()
+            if not raw_url:
+                continue
+            m = re.search(r'(?:v=|/)([\w-]{11})(?:\?|&|$)', raw_url)
+            if not m:
+                errors += 1
+                continue
+            clean = 'https://www.youtube.com/watch?v=' + m.group(1)
+            existing = conn.execute(
+                "SELECT id FROM queue WHERE clean_url=? AND status != 'played'",
+                (clean,)
+            ).fetchone()
+            if existing:
+                errors += 1
+                continue
+            conn.execute(
+                "INSERT INTO queue (user_id, username, youtube_url, clean_url, title, ip_address) VALUES (?,?,?,?,?,?)",
+                (current_user.id, current_user.username, clean, clean, clean, 'import')
+            )
+            added += 1
     conn.commit()
     conn.close()
     msg = f'Imported {added} song(s)'
