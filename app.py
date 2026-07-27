@@ -726,7 +726,7 @@ def direct_video():
 def replay_from_history(item_id):
     """Re-queue a previously played song from history."""
     conn = get_db()
-    item = conn.execute("SELECT * FROM queue WHERE id=? AND status='played'", (item_id,)).fetchone()
+    item = conn.execute("SELECT * FROM queue WHERE id=?", (item_id,)).fetchone()
     if not item:
         conn.close()
         return jsonify({'error': 'Not found'}), 404
