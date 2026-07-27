@@ -1129,34 +1129,6 @@ def export_csv():
     )
     return Response(out, mimetype='text/plain', headers={'Content-Disposition': 'attachment; filename=cloud-dj-links.txt'})
 
-# ─── IMPORT JOB TRACKER ───
-_import_jobs = {}  # job_id -> {total, done, failed, completed, items: [(id, url)]}
-_import_job_counter = 0
-_import_job_lock = threading.Lock()
-
-def _import_title_worker(job_id):
-    """Background worker that resolves titles one by one with rate limiting."""
-    job = _import_jobs.get(job_id)
-    if not job:
-        return
-    for idx, (item_id, url) in enumerate(job['items']):
-        if idx > 0:
-            time.sleep(0.5)  # rate limit — don't flood yt-dlp
-        try:
-            result = run_ytdl(['--print', 'title', '-s', url])
-            title = result.stdout.strip()
-            if title:
-                conn = get_db()
-                conn.execute("UPDATE queue SET title=? WHERE id=?", (title, item_id))
-                conn.commit()
-                conn.close()
-                job['done'] += 1
-            else:
-                job['failed'] += 1
-        except:
-            job['failed'] += 1
-    job['completed'] = True
-
 @app.route('/admin/import-csv', methods=['POST'])
 @login_required
 def import_csv():
@@ -1170,13 +1142,18 @@ def import_csv():
     conn = get_db()
     added = 0
     errors = 0
-    items = []
     for line in content.strip().split('\n'):
-        raw_url = line.strip()
-        # Strip comments (#) — allows annotating links with song titles
-        comment_pos = raw_url.find('#')
+        raw_line = line.strip()
+        if not raw_line:
+            continue
+        # Extract title from # comment, then strip it for URL parsing
+        title = ''
+        comment_pos = raw_line.find('#')
         if comment_pos >= 0:
-            raw_url = raw_url[:comment_pos].strip()
+            title = raw_line[comment_pos + 1:].strip()
+            raw_url = raw_line[:comment_pos].strip()
+        else:
+            raw_url = raw_line
         if not raw_url:
             continue
         m = re.search(r'(?:v=|/)([\w-]{11})(?:\?|&|$)', raw_url)
@@ -1191,54 +1168,18 @@ def import_csv():
         if existing:
             errors += 1
             continue
+        # Use the # comment as the title, fall back to the URL if none provided
+        song_title = title if title else clean
         conn.execute(
             "INSERT INTO queue (user_id, username, youtube_url, clean_url, title, status, ip_address) VALUES (?,?,?,?,?,?,?)",
-            (current_user.id, current_user.username, clean, clean, clean, 'played', 'import')
+            (current_user.id, current_user.username, clean, clean, song_title, 'played', 'import')
         )
-        item_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
-        items.append((item_id, clean))
         added += 1
     conn.commit()
     conn.close()
-
-    if added == 0:
-        msg = f'Imported 0 song(s)'
-        if errors: msg += f', {errors} skipped'
-        return jsonify({'success': True, 'message': msg, 'added': 0, 'skipped': errors})
-
-    # Create import job for background title resolution
-    global _import_job_counter
-    with _import_job_lock:
-        _import_job_counter += 1
-        job_id = f'import_{_import_job_counter}'
-        _import_jobs[job_id] = {
-            'total': added,
-            'done': 0,
-            'failed': 0,
-            'completed': False,
-            'items': items,
-        }
-    threading.Thread(target=_import_title_worker, args=(job_id,), daemon=True).start()
-    return jsonify({
-        'success': True,
-        'message': f'Importing {added} song(s)...',
-        'added': added,
-        'skipped': errors,
-        'job_id': job_id,
-    })
-
-@app.route('/admin/import-progress/<job_id>')
-@login_required
-def import_progress(job_id):
-    job = _import_jobs.get(job_id)
-    if not job:
-        return jsonify({'error': 'Job not found'}), 404
-    return jsonify({
-        'total': job['total'],
-        'done': job['done'],
-        'failed': job['failed'],
-        'completed': job['completed'],
-    })
+    msg = f'Imported {added} song(s)'
+    if errors: msg += f', {errors} skipped'
+    return jsonify({'success': True, 'message': msg, 'added': added, 'skipped': errors})
 
 def fetch_title(item_id, url):
     """Get video title from yt-dlp in background."""
