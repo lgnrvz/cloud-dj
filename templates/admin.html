@@ -7,6 +7,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 100%; overflow-x: hidden; }
         body {
             font-family: 'Inter', -apple-system, sans-serif;
             background: #07070d;
@@ -23,24 +24,10 @@
         }
         .brand { font-weight: 800; font-size: 1.1rem; letter-spacing: -0.5px; color: #fff; }
         .brand span { color: #1db954; }
-        .navbar a { color: #888; text-decoration: none; margin-left: 18px; font-size: 0.8rem; }
+        .navbar a { color: #888; text-decoration: none; margin-left: 18px; font-size: 0.8rem; transition: .2s; }
         .navbar a:hover { color: #fff; }
-        .container { max-width: 1000px; margin: 0 auto; padding: 20px; }
-
-        .now-playing-bar {
-            background: linear-gradient(135deg, #0d0d16, #111122);
-            border: 1px solid #ffd70033;
-            border-radius: 10px;
-            padding: 14px 18px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        .now-playing-bar .dot { width: 8px; height: 8px; background: #ffd700; border-radius: 50%; animation: pulse 1.5s infinite; flex-shrink: 0; }
-        @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(1.4); } }
-        .now-playing-bar .lbl { color: #ffd700; font-weight: 600; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; }
-        .now-playing-bar .trk { color: #fff; font-weight: 700; font-size: 0.9rem; }
-        .now-playing-bar .sub { color: #666; font-size: 0.75rem; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        @media (max-width: 768px) { .container { padding: 8px; } }
 
         .admin-grid { display: grid; grid-template-columns: 4fr 1fr; gap: 16px; align-items: start; }
         .admin-grid .full { grid-column: 1 / -1; }
@@ -58,59 +45,85 @@
             background: #0d0d16;
             border: 1px solid #1a1a2e;
             border-radius: 10px;
-            padding: 16px;
+            overflow: hidden;
         }
-        .card h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: #666; margin-bottom: 12px; font-weight: 600; }
+        .card-header {
+            padding: 14px 18px;
+            border-bottom: 1px solid #1a1a2e;
+            font-weight: 600;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #666;
+            display: flex;
+            justify-content: space-between;
+        }
+        .card h2 {
+            padding: 14px 18px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #666;
+            border-bottom: 1px solid #1a1a2e;
+        }
+        .now-playing-bar {
+            background: linear-gradient(135deg, #0d0d16, #111122);
+            border: 1px solid #1db95433;
+            border-radius: 10px;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        .now-playing-bar .dot {
+            width: 8px; height: 8px; background: #1db954;
+            border-radius: 50%; animation: pulse 1.5s infinite; flex-shrink: 0;
+        }
+        @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(1.4); } }
+        .now-playing-bar .lbl { color: #1db954; font-weight: 600; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; }
+        .now-playing-bar .trk { color: #fff; font-weight: 700; font-size: 1rem; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .now-playing-bar .sub { color: #666; font-size: 0.75rem; margin-top: 2px; }
 
         .history-item {
-            padding: 10px 12px;
+            padding: 10px 18px;
             border-bottom: 1px solid #111122;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+        }
+        .history-item:last-child { border-bottom: none; }
+        .history-item:hover { background: #111122; }
+        .history-item .info { flex: 1; min-width: 0; }
+        .history-item .title { font-weight: 500; color: #e0e0e8; font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .history-item .sub { font-size: 0.65rem; color: #555; margin-top: 2px; }
+        .history-item .sub span { margin-right: 10px; }
+
+        .user-item {
+            padding: 8px 10px;
+            background: #0d0d16;
+            border: 1px solid #1a1a2e;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            font-size: 0.8rem;
             display: flex;
             align-items: center;
             gap: 8px;
-            transition: .15s;
         }
-        .history-item:hover { background: #111122; }
-        .history-item .info { flex: 1; min-width: 0; }
-        .history-item .title { font-weight: 600; font-size: 0.85rem; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .history-item .sub { font-size: 0.7rem; color: #555; margin-top: 2px; }
-        .history-item .sub span { margin-right: 10px; }
-
-        .req-badge {
-            background: #1db95422;
-            color: #1db954;
-            border: 1px solid #1db95444;
-            padding: 2px 8px;
-            border-radius: 10px;
-            font-size: 0.65rem;
-            font-weight: 600;
-            white-space: nowrap;
-        }
-
-        .view-btn { background: #333; color: #888; border: 1px solid #2a2a3a; display: inline-block; text-align: center; text-decoration: none; padding: 4px 8px; border-radius: 5px; font-size: 0.65rem; transition: .15s; }
-        .view-btn:hover { background: #444; color: #1db954; border-color: #1db95444; }
-
-        .user-item { padding: 8px 10px; background: #0d0d16; border: 1px solid #1a1a2e; border-radius: 6px; margin-bottom: 6px; font-size: 0.8rem; display: flex; align-items: center; gap: 8px; }
-        .user-item .name { color: #e0e0e8; font-weight: 600; flex-shrink: 0; }
-        .user-item .badge-admin { color: #ffd700; font-size: 0.6rem; margin-left: 4px; text-transform: uppercase; }
+        .user-item .name { color: #e0e0e8; font-weight: 600; font-size: 0.75rem; }
         .user-item .joined { color: #555; font-size: 0.7rem; flex: 1; }
-        .srv-info { font-size: 0.8rem; color: #555; line-height: 1.8; }
-        .srv-info strong { color: #888; }
-        .empty { text-align: center; padding: 32px; color: #444; font-size: 0.85rem; }
-
-        .clr-btn {
-            font-family: 'Inter', sans-serif;
-            padding: 6px 14px;
-            border-radius: 5px;
-            border: 1px solid #ff333344;
-            background: #ff333322;
-            color: #ff4444;
-            font-size: 0.7rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: .15s;
+        .badge-admin {
+            display: inline-block; background: #1db95422; color: #1db954;
+            border-radius: 4px; padding: 1px 6px; font-size: 0.6rem;
+            font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
         }
-        .clr-btn:hover { background: #ff333344; }
+        .clr-btn {
+            background: none; border: 1px solid #2a2a3a; color: #888;
+            cursor: pointer; font-size: 0.65rem; padding: 4px 10px;
+            border-radius: 4px; font-family: inherit; transition: .15s;
+        }
+        .clr-btn:hover { border-color: #ff444444; color: #ff4444; }
         .del-btn {
             background: none; border: none; cursor: pointer;
             font-size: 0.75rem; padding: 2px 5px; transition: .15s;
@@ -144,13 +157,29 @@
             background: #fff; transition: .2s;
         }
         .toggle-switch.on::after { left: 18px; }
+
+        .view-btn {
+            color: #555; text-decoration: none; font-size: 0.6rem;
+            padding: 2px 6px; border: 1px solid #2a2a3a; border-radius: 4px;
+            transition: .2s; white-space: nowrap; font-family: inherit;
+        }
+        .view-btn:hover { color: #1db954; border-color: #1db95444; }
+
+        .req-badge {
+            display: inline-block; background: #1db95411; color: #555;
+            border-radius: 4px; padding: 1px 5px; font-size: 0.6rem;
+            font-weight: 600;
+        }
+
+        .srv-info { font-size: 0.78rem; line-height: 1.7; padding: 10px 14px; }
+        .srv-info strong { color: #888; }
+        .empty { text-align: center; padding: 32px; color: #444; font-size: 0.85rem; }
     </style>
 </head>
 <body>
     <nav class="navbar">
-        <div class="brand">Cloud<span>DJ</span> <span style="color:#ffd700;font-weight:400;">Admin</span></div>
+        <div class="brand">Cloud<span>DJ</span></div>
         <div>
-            <span style="color:#555;font-size:0.8rem;">{{ current_user.name }}</span>
             <a href="/queue">Queue</a>
             <a href="/logout">Sign out</a>
         </div>
@@ -166,106 +195,108 @@
             </div>
         </div>
 
+        <!-- Left column: History + Import/Export -->
         <div>
-                <div class="card">
-                    <h2>History</h2>
-                    <div style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
-                        <span style="color:#444;font-size:0.7rem;" id="histTotal">0 played</span>
-                        <div style="display:flex;align-items:center;gap:8px;">
-                            <button class="clr-btn" onclick="clearHistory()">Clear All</button>
-                        </div>
+            <div class="card">
+                <h2>History</h2>
+                <div style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+                    <span style="color:#444;font-size:0.7rem;" id="histTotal">0 played</span>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <button class="clr-btn" onclick="clearHistory()">Clear All</button>
                     </div>
-                    <div id="histList">
-                        <div class="empty">Loading...</div>
-                    </div>
-                    <div id="histPages" style="display:flex;justify-content:center;align-items:center;gap:8px;padding:10px 0 4px 0;font-size:0.7rem;">
-                        <button id="histPrev" onclick="loadHistory(curPage-1)" style="background:none;border:none;color:#555;cursor:pointer;font-family:inherit;font-size:0.7rem;">&larr; Prev</button>
-                        <span id="histPageInfo" style="color:#444;">Page 1 / 1</span>
-                        <button id="histNext" onclick="loadHistory(curPage+1)" style="background:none;border:none;color:#555;cursor:pointer;font-family:inherit;font-size:0.7rem;">Next &rarr;</button>
-                    </div>
+                </div>
+                <div id="histList">
+                    <div class="empty">Loading...</div>
+                </div>
+                <div id="histPages" style="display:flex;justify-content:center;align-items:center;gap:8px;padding:10px 0 4px 0;font-size:0.7rem;">
+                    <button id="histPrev" onclick="loadHistory(curPage-1)" style="background:none;border:none;color:#555;cursor:pointer;font-family:inherit;font-size:0.7rem;">&larr; Prev</button>
+                    <span id="histPageInfo" style="color:#444;">Page 1 / 1</span>
+                    <button id="histNext" onclick="loadHistory(curPage+1)" style="background:none;border:none;color:#555;cursor:pointer;font-family:inherit;font-size:0.7rem;">Next &rarr;</button>
                 </div>
             </div>
 
-            <div>
-                <div class="card">
-                    <h2>Users</h2>
-                    <div style="margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">
-                        <span style="color:#444;font-size:0.7rem;" id="usersTotal">0</span>
-                        <button class="clr-btn" onclick="clearUsers()" style="padding:4px 10px;">Clear All</button>
+            <!-- Import / Export (right below history) -->
+            <div class="card" style="margin-top:16px;">
+                <div class="card-header">Import / Export</div>
+                <div style="padding:14px;display:flex;flex-direction:column;gap:10px;">
+                    <button onclick="exportCSV()" style="padding:8px;border-radius:5px;border:none;background:#1db954;color:#000;font-family:Inter,sans-serif;font-size:0.75rem;font-weight:600;cursor:pointer;">Download CSV</button>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <input type="file" id="csvFile" accept=".csv" style="flex:1;font-size:0.7rem;color:#888;">
+                        <button onclick="importCSV()" style="padding:8px 12px;border-radius:5px;border:1px solid #2a2a3a;background:none;color:#888;font-family:Inter,sans-serif;font-size:0.7rem;cursor:pointer;transition:.15s;" onmouseover="this.style.color='#1db954';this.style.borderColor='#1db95444'" onmouseout="this.style.color='#888';this.style.borderColor='#2a2a3a'">Import</button>
                     </div>
-                    <div id="usersList">
-                        <div style="padding:16px;text-align:center;color:#333;font-size:0.75rem;">Loading...</div>
-                    </div>
-                    <div id="usersPages" style="display:flex;justify-content:center;align-items:center;gap:8px;padding:6px 0 2px 0;font-size:0.7rem;">
-                        <button id="usersPrev" onclick="loadUsers(curUsersPage-1)" style="background:none;border:none;color:#555;cursor:pointer;font-family:inherit;font-size:0.7rem;">&larr; Prev</button>
-                        <span id="usersPageInfo" style="color:#444;">Page 1 / 1</span>
-                        <button id="usersNext" onclick="loadUsers(curUsersPage+1)" style="background:none;border:none;color:#555;cursor:pointer;font-family:inherit;font-size:0.7rem;">Next &rarr;</button>
-                    </div>
+                    <div id="importMsg" style="font-size:0.7rem;color:#555;"></div>
                 </div>
+            </div>
+        </div>
 
-                <div class="card" style="margin-top:16px;">
-                    <h2>Server</h2>
-                    <div class="srv-info">
-                        <strong>Admin:</strong> admin / djadmin123<br>
-                        <strong>URL:</strong> http://{{ request.host }}<br>
-                        <strong>Played:</strong> <span id="srvPlayed">{{ history|length }}</span> total<br>
-                        <strong>Users:</strong> <span id="srvUsers">{{ users|length }}</span>
-                    </div>
+        <!-- Right column -->
+        <div>
+            <div class="card">
+                <h2>Users</h2>
+                <div style="margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">
+                    <span style="color:#444;font-size:0.7rem;" id="usersTotal">0</span>
+                    <button class="clr-btn" onclick="clearUsers()" style="padding:4px 10px;">Clear All</button>
                 </div>
+                <div id="usersList">
+                    <div style="padding:16px;text-align:center;color:#333;font-size:0.75rem;">Loading...</div>
+                </div>
+                <div id="usersPages" style="display:flex;justify-content:center;align-items:center;gap:8px;padding:6px 0 2px 0;font-size:0.7rem;">
+                    <button id="usersPrev" onclick="loadUsers(curUsersPage-1)" style="background:none;border:none;color:#555;cursor:pointer;font-family:inherit;font-size:0.7rem;">&larr; Prev</button>
+                    <span id="usersPageInfo" style="color:#444;">Page 1 / 1</span>
+                    <button id="usersNext" onclick="loadUsers(curUsersPage+1)" style="background:none;border:none;color:#555;cursor:pointer;font-family:inherit;font-size:0.7rem;">Next &rarr;</button>
+                </div>
+            </div>
 
-                <div class="card" style="margin-top:16px;">
-                    <h2>Settings</h2>
+            <div class="card">
+                <h2>Server</h2>
+                <div class="srv-info">
+                    <strong>Played:</strong> <span id="srvPlayed">{{ history|length }}</span> total<br>
+                    <strong>Users:</strong> <span id="srvUsers">{{ users|length }}</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Settings</h2>
+                <div style="padding:4px 14px 10px;">
                     <div class="toggle-row">
-                        <span>Videoke Scoring</span>
-                        <button class="toggle-switch off" id="scoringToggle" onclick="toggleScoring()"></button>
+                        <span>Scoring</span>
+                        <button id="scoringToggle" class="toggle-switch off" onclick="toggleSetting('scoring', this)"></button>
                     </div>
                     <div class="toggle-row">
-                        <span>Show Leaderboard</span>
-                        <button class="toggle-switch off" id="lbToggle" onclick="toggleLeaderboard()"></button>
+                        <span>Leaderboard</span>
+                        <button id="lbToggle" class="toggle-switch off" onclick="toggleSetting('leaderboard', this)"></button>
                     </div>
                     <div class="toggle-row">
                         <span style="font-size:0.75rem;">Queue Limit (1-16)</span>
                         <div style="display:flex;align-items:center;gap:8px;">
                             <input type="number" id="consecutiveLimit" min="1" max="16" value="16"
-                                   style="width:50px;padding:4px 6px;border-radius:4px;border:1px solid #2a2a3a;background:#1a1a2a;color:#e0e0e8;font-family:'Inter',sans-serif;font-size:0.75rem;text-align:center;outline:none;">
-                            <button id="saveLimitBtn" onclick="saveConsecutiveLimit()" style="padding:4px 10px;border-radius:4px;border:1px solid #2a2a3a;background:#1a1a2a;color:#888;font-family:'Inter',sans-serif;font-size:0.65rem;cursor:pointer;">Save</button>
+                                   style="width:50px;padding:4px 6px;border-radius:4px;border:1px solid #2a2a3a;background:#1a1a2a;color:#e0e0e8;font-family:Inter,sans-serif;font-size:0.75rem;text-align:center;outline:none;">
+                            <button id="saveLimitBtn" onclick="saveConsecutiveLimit()" style="padding:4px 10px;border-radius:4px;border:1px solid #2a2a3a;background:#1a1a2a;color:#888;font-family:Inter,sans-serif;font-size:0.65rem;cursor:pointer;">Save</button>
                             <span id="limitSaved" style="display:none;font-size:0.65rem;color:#1db954;">Saved</span>
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <!-- Import / Export -->
-                <div class="card" style="margin-top:16px;">
-                    <div class="card-header">Import / Export</div>
-                    <div style="padding:14px;display:flex;flex-direction:column;gap:10px;">
-                        <button onclick="exportCSV()" style="padding:8px;border-radius:5px;border:none;background:#1db954;color:#000;font-family:'Inter',sans-serif;font-size:0.75rem;font-weight:600;cursor:pointer;">Download CSV</button>
-                        <div style="display:flex;gap:8px;align-items:center;">
-                            <input type="file" id="csvFile" accept=".csv" style="flex:1;font-size:0.7rem;color:#888;">
-                            <button onclick="importCSV()" style="padding:8px 12px;border-radius:5px;border:1px solid #2a2a3a;background:none;color:#888;font-family:'Inter',sans-serif;font-size:0.7rem;cursor:pointer;transition:.15s;" onmouseover="this.style.color='#1db954';this.style.borderColor='#1db95444'" onmouseout="this.style.color='#888';this.style.borderColor='#2a2a3a'">Import</button>
+            <div class="card" style="margin-top:16px;">
+                <h2>Change Password</h2>
+                <div style="padding:4px 0;">
+                    <form id="passwordForm" onsubmit="changePassword(event)" style="display:flex;flex-direction:column;gap:8px;">
+                        <input type="password" id="currentPass" placeholder="Current password" required
+                               style="width:100%;padding:8px 10px;border-radius:5px;border:1px solid #2a2a3a;background:#1a1a2a;color:#e0e0e8;font-family:Inter,sans-serif;font-size:0.8rem;outline:none;">
+                        <input type="password" id="newPass" placeholder="New password" required minlength="4"
+                               style="width:100%;padding:8px 10px;border-radius:5px;border:1px solid #2a2a3a;background:#1a1a2a;color:#e0e0e8;font-family:Inter,sans-serif;font-size:0.8rem;outline:none;">
+                        <input type="password" id="confirmPass" placeholder="Confirm new password" required minlength="4"
+                               style="width:100%;padding:8px 10px;border-radius:5px;border:1px solid #2a2a3a;background:#1a1a2a;color:#e0e0e8;font-family:Inter,sans-serif;font-size:0.8rem;outline:none;">
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <button type="submit" id="passBtn" style="padding:8px 16px;border-radius:5px;border:none;background:#1db954;color:#000;font-family:Inter,sans-serif;font-size:0.75rem;font-weight:600;cursor:pointer;">Update Password</button>
+                            <span id="passMsg" style="display:none;font-size:0.7rem;"></span>
                         </div>
-                        <div id="importMsg" style="font-size:0.7rem;color:#555;"></div>
-                    </div>
-                </div>
-
-                <div class="card" style="margin-top:16px;">
-                    <h2>Change Password</h2>
-                    <div style="padding:4px 0;">
-                        <form id="passwordForm" onsubmit="changePassword(event)" style="display:flex;flex-direction:column;gap:8px;">
-                            <input type="password" id="currentPass" placeholder="Current password" required
-                                   style="width:100%;padding:8px 10px;border-radius:5px;border:1px solid #2a2a3a;background:#1a1a2a;color:#e0e0e8;font-family:'Inter',sans-serif;font-size:0.8rem;outline:none;">
-                            <input type="password" id="newPass" placeholder="New password" required minlength="4"
-                                   style="width:100%;padding:8px 10px;border-radius:5px;border:1px solid #2a2a3a;background:#1a1a2a;color:#e0e0e8;font-family:'Inter',sans-serif;font-size:0.8rem;outline:none;">
-                            <input type="password" id="confirmPass" placeholder="Confirm new password" required minlength="4"
-                                   style="width:100%;padding:8px 10px;border-radius:5px;border:1px solid #2a2a3a;background:#1a1a2a;color:#e0e0e8;font-family:'Inter',sans-serif;font-size:0.8rem;outline:none;">
-                            <div style="display:flex;align-items:center;gap:8px;">
-                                <button type="submit" id="passBtn" style="padding:8px 16px;border-radius:5px;border:none;background:#1db954;color:#000;font-family:'Inter',sans-serif;font-size:0.75rem;font-weight:600;cursor:pointer;">Update Password</button>
-                                <span id="passMsg" style="display:none;font-size:0.7rem;"></span>
-                            </div>
-                        </form>
-                    </div>
+                    </form>
                 </div>
             </div>
         </div>
+    </div>
     </div>
 
     <script>
@@ -389,160 +420,102 @@
         btn.className = 'toggle-switch ' + (d.show ? 'on' : 'off');
     }).catch(() => {});
 
-    function toggleScoring() {
-        const btn = document.getElementById('scoringToggle');
-        const newVal = btn.classList.contains('off');
-        fetch('/admin/settings', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({scoring: newVal})
-        }).then(r=>r.json()).then(d => {
-            btn.className = 'toggle-switch ' + (d.scoring ? 'on' : 'off');
-        });
+    function toggleSetting(name, btn) {
+        const on = btn.className === 'off';
+        btn.className = 'toggle-switch ' + (on ? 'on' : 'off');
+        const ep = name === 'scoring' ? '/admin/settings' : '/admin/settings/leaderboard';
+        const body = name === 'scoring' ? {scoring: on} : {show: on};
+        fetch(ep, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) })
+            .then(r => r.json()).catch(() => {});
     }
 
-    function toggleLeaderboard() {
-        const btn = document.getElementById('lbToggle');
-        const newVal = btn.classList.contains('off');
-        fetch('/admin/settings/leaderboard', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({show: newVal})
-        }).then(r=>r.json()).then(d => {
-            btn.className = 'toggle-switch ' + (d.show ? 'on' : 'off');
-        });
-    }
-
-    // Load consecutive queue limit
-    fetch('/admin/settings/consecutive').then(r=>r.json()).then(d => {
-        document.getElementById('consecutiveLimit').value = d.limit;
+    /** Load current queue limit */
+    fetch('/admin/settings/queue-limit').then(r=>r.json()).then(d => {
+        if (d.limit) document.getElementById('consecutiveLimit').value = d.limit;
     }).catch(() => {});
 
     function saveConsecutiveLimit() {
-        const input = document.getElementById('consecutiveLimit');
-        const btn = document.getElementById('saveLimitBtn');
-        const saved = document.getElementById('limitSaved');
-        const val = parseInt(input.value);
-        if (isNaN(val) || val < 1 || val > 16) {
-            saved.textContent = 'Must be 1-16';
-            saved.style.color = '#ffd700';
-            saved.style.display = 'inline';
-            setTimeout(() => { saved.style.display = 'none'; }, 2000);
-            return;
-        }
-        btn.textContent = '...';
-        fetch('/admin/settings/consecutive', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({limit: val})
-        }).then(r=>r.json()).then(d => {
-            if (d.success) {
-                input.value = d.limit;
-                saved.textContent = 'Limit: ' + d.limit;
-                saved.style.color = '#1db954';
-                saved.style.display = 'inline';
-                btn.textContent = 'Save';
-                setTimeout(() => { saved.style.display = 'none'; }, 3000);
-            } else {
-                saved.textContent = d.error || 'Error';
-                saved.style.color = '#ff4444';
-                saved.style.display = 'inline';
-                btn.textContent = 'Save';
-                setTimeout(() => { saved.style.display = 'none'; }, 3000);
-            }
-        }).catch(() => {
-            saved.textContent = 'Failed';
-            saved.style.color = '#ff4444';
-            saved.style.display = 'inline';
-            btn.textContent = 'Save';
-            setTimeout(() => { saved.style.display = 'none'; }, 3000);
-        });
+        const val = parseInt(document.getElementById('consecutiveLimit').value) || 16;
+        fetch('/admin/settings/queue-limit', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({limit: val}) })
+            .then(r=>r.json()).then(d => {
+                if (d.success) {
+                    const msg = document.getElementById('limitSaved');
+                    msg.style.display = 'inline';
+                    setTimeout(() => msg.style.display = 'none', 2000);
+                }
+            }).catch(() => {});
     }
 
+    /** Clear all history */
+    function clearHistory() {
+        if (!confirm('Delete ALL played history? This cannot be undone.')) return;
+        fetch('/admin/clear-history', { method: 'POST' })
+            .then(r => r.json())
+            .then(() => loadHistory(1))
+            .catch(() => {});
+    }
+
+    function deleteHistoryItem(id) {
+        if (!confirm('Delete this history entry?')) return;
+        fetch('/admin/remove/' + id, { method: 'POST' })
+            .then(() => loadHistory(curPage))
+            .catch(() => {});
+    }
+
+    /** Admin love a history item */
     function adminLove(id, btn) {
         fetch('/admin/love/' + id, { method: 'POST' })
             .then(r => r.json())
             .then(d => {
                 if (d.loved) { btn.classList.add('loved'); btn.innerHTML = '&#9829;'; }
                 else { btn.classList.remove('loved'); btn.innerHTML = '&#9825;'; }
-            });
+            }).catch(() => {});
     }
 
-    function clearHistory() {
-        if (!confirm('Delete all history? This cannot be undone.')) return;
-        fetch('/admin/clear-history', { method: 'POST' })
-            .then(() => location.reload());
-    }
-
-    function deleteHistoryItem(id) {
-        if (!confirm('Delete this history entry?')) return;
-        fetch('/admin/remove/' + id, { method: 'POST' })
-            .then(() => loadHistory(curPage));
-    }
-
+    /** Clear all non-admin users */
     function clearUsers() {
         if (!confirm('Delete ALL non-admin users? Admins will be kept. This cannot be undone.')) return;
         fetch('/admin/clear-users', { method: 'POST' })
             .then(r => r.json())
-            .then(d => {
-                if (d.success) {
-                    loadUsers(1);
-                    document.getElementById('srvUsers').textContent = d.remaining;
-                }
-            });
+            .then(() => loadUsers(1))
+            .catch(() => {});
     }
 
-    function deleteUser(id, username) {
-        if (!confirm('Delete user "' + username + '"? This cannot be undone.')) return;
+    function deleteUser(id, name) {
+        if (!confirm('Delete user \'' + name + '\'? This cannot be undone.')) return;
         fetch('/admin/remove-user/' + id, { method: 'POST' })
             .then(r => r.json())
-            .then(d => {
-                if (d.success) loadUsers(curUsersPage);
-                else alert(d.error || 'Failed');
-            });
+            .then(() => loadUsers(1))
+            .catch(() => {});
     }
 
+    /** Change admin password */
     function changePassword(e) {
         e.preventDefault();
         const btn = document.getElementById('passBtn');
         const msg = document.getElementById('passMsg');
-        const current = document.getElementById('currentPass').value;
-        const newPass = document.getElementById('newPass').value;
-        const confirm = document.getElementById('confirmPass').value;
-        if (!current || !newPass || !confirm) {
-            msg.style.display = 'inline'; msg.style.color = '#ffd700';
-            msg.textContent = 'Fill all fields'; return;
-        }
-        if (newPass !== confirm) {
-            msg.style.display = 'inline'; msg.style.color = '#ffd700';
-            msg.textContent = 'Passwords do not match'; return;
-        }
-        if (newPass.length < 4) {
-            msg.style.display = 'inline'; msg.style.color = '#ffd700';
-            msg.textContent = 'Min 4 characters'; return;
-        }
-        btn.disabled = true; btn.textContent = '...';
+        btn.disabled = true;
+        btn.textContent = '...';
         fetch('/admin/change-password', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({current_password: current, new_password: newPass})
+            body: JSON.stringify({
+                current: document.getElementById('currentPass').value,
+                new: document.getElementById('newPass').value,
+                confirm: document.getElementById('confirmPass').value
+            })
         }).then(r => r.json()).then(d => {
-            if (d.success) {
-                msg.style.display = 'inline'; msg.style.color = '#1db954';
-                msg.textContent = 'Password updated!';
-                document.getElementById('currentPass').value = '';
-                document.getElementById('newPass').value = '';
-                document.getElementById('confirmPass').value = '';
-            } else {
-                msg.style.display = 'inline'; msg.style.color = '#ff4444';
-                msg.textContent = d.error || 'Failed';
-            }
+            msg.style.display = 'inline';
+            msg.textContent = d.message || d.error;
+            msg.style.color = d.success ? '#1db954' : '#ff4444';
+            if (d.success) { document.getElementById('passwordForm').reset(); }
         }).catch(() => {
-            msg.style.display = 'inline'; msg.style.color = '#ff4444';
+            msg.style.display = 'inline';
             msg.textContent = 'Server error';
+            msg.style.color = '#ff4444';
         }).finally(() => {
-            btn.disabled = false; btn.textContent = 'Update Password';
-            setTimeout(() => { msg.style.display = 'none'; }, 4000);
+            btn.disabled = false;
+            btn.textContent = 'Update Password';
         });
     }
     </script>
