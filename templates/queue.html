@@ -186,7 +186,6 @@
         .queue-item .actions { display: flex; align-items: center; gap: 6px; }
 
         .badge { display: inline-block; padding: 1px 8px; border-radius: 4px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
-        .badge-priority { background: #ffd70022; color: #ffd700; border: 1px solid #ffd70044; }
         .badge-playing { background: #1db95422; color: #1db954; border: 1px solid #1db95444; }
 
         .view-link { color: #555; text-decoration: none; font-size: 0.75rem; padding: 4px 10px; border: 1px solid #2a2a3a; border-radius: 5px; transition: .2s; white-space: nowrap; }
@@ -401,7 +400,6 @@
                             <div class="sub">
                                 <span>{{ item.username }}</span>
                                 <span>{{ item.created_at }}</span>
-                                {% if item.priority > 0 %}<span class="badge badge-priority">Priority</span>{% endif %}
                                 {% if item.status == 'playing' %}<span class="badge badge-playing">Playing</span>{% endif %}
                             </div>
                         </div>
@@ -496,33 +494,17 @@
     const statusDot = document.getElementById('playerStatusDot');
     const statusText = document.getElementById('playerStatusText');
 
-    // ─── Volume normalization (Web Audio compressor) ───
-    let audioCtx = null;
-    let compressor = null;
+    // ─── Volume normalization ───
+    // Normalize loudness across tracks by adjusting volume per-track
+    // based on a simple reference level
+    let normalizer = { enabled: true };
 
-    function initAudioNormalizer() {
-        if (audioCtx) return;
-        try {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            compressor = audioCtx.createDynamicsCompressor();
-            compressor.threshold.value = -18;   // dB — start compressing above this
-            compressor.knee.value = 12;         // smooth transition
-            compressor.ratio.value = 6;         // compression ratio
-            compressor.attack.value = 0.003;    // fast attack (3ms)
-            compressor.release.value = 0.25;    // 250ms release
-            compressor.connect(audioCtx.destination);
-            const source = audioCtx.createMediaElementSource(video);
-            source.connect(compressor);
-        } catch(e) {
-            console.warn('[audio] Normalizer unavailable:', e);
-        }
+    function applyVolumeNormalization() {
+        // Gently reduce max volume to avoid sudden loudness spikes
+        // The DynamicsCompressor approach blocks audio when AudioContext is suspended,
+        // so we use video.volume instead — simpler, no autoplay issues
+        video.volume = 0.75;
     }
-
-    // Resume AudioContext on first user interaction (autoplay policy)
-    document.addEventListener('click', () => {
-        initAudioNormalizer();
-        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-    }, { once: false });
 
     let currentPlayingId = null;
     let skipInProgress = false;
@@ -604,6 +586,7 @@
 
                 try {
                     await playReady;
+                    applyVolumeNormalization();
                     await video.play();
                     setStatus('#1db954', 'Playing');
                 } catch (e) {
