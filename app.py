@@ -1121,15 +1121,10 @@ def export_csv():
     if not current_user.is_admin:
         return jsonify({'error': 'Unauthorized'}), 403
     conn = get_db()
-    rows = conn.execute("SELECT id, title, clean_url, youtube_url, username, status, created_at FROM queue ORDER BY id DESC").fetchall()
+    rows = conn.execute("SELECT clean_url, youtube_url FROM queue ORDER BY id DESC").fetchall()
     conn.close()
-    import csv, io
-    out = io.StringIO()
-    w = csv.writer(out)
-    w.writerow(['id','title','url','username','status','date'])
-    for r in rows:
-        w.writerow([r['id'], r['title'], r['clean_url'] or r['youtube_url'], r['username'], r['status'], r['created_at']])
-    return Response(out.getvalue(), mimetype='text/csv', headers={'Content-Disposition': 'attachment; filename=cloud-dj-export.csv'})
+    out = '\n'.join(r['clean_url'] or r['youtube_url'] or '' for r in rows)
+    return Response(out, mimetype='text/plain', headers={'Content-Disposition': 'attachment; filename=cloud-dj-links.txt'})
 
 @app.route('/admin/import-csv', methods=['POST'])
 @login_required
@@ -1139,62 +1134,32 @@ def import_csv():
     csv_file = request.files.get('csv')
     if not csv_file:
         return jsonify({'error': 'No file uploaded'}), 400
-    import csv, io
+    import io
     content = csv_file.read().decode('utf-8')
-    lines = content.strip().split('\n')
     conn = get_db()
     added = 0
     errors = 0
-    # Detect format: if first line looks like a header (contains url/title), use DictReader
-    first = lines[0].strip().lower() if lines else ''
-    if 'url' in first or 'title' in first or 'youtube' in first:
-        reader = csv.DictReader(io.StringIO(content))
-        for row in reader:
-            raw_url = (row.get('url') or row.get('clean_url') or row.get('youtube_url') or '').strip()
-            title = (row.get('title') or 'Imported').strip()
-            if not raw_url:
-                errors += 1
-                continue
-            m = re.search(r'(?:v=|/)([\w-]{11})(?:\?|&|$)', raw_url.strip())
-            if not m:
-                errors += 1
-                continue
-            clean = 'https://www.youtube.com/watch?v=' + m.group(1)
-            existing = conn.execute(
-                "SELECT id FROM queue WHERE clean_url=? AND status != 'played'",
-                (clean,)
-            ).fetchone()
-            if existing:
-                errors += 1
-                continue
-            conn.execute(
-                "INSERT INTO queue (user_id, username, youtube_url, clean_url, title, ip_address) VALUES (?,?,?,?,?,?)",
-                (current_user.id, current_user.username, clean, clean, title, 'import')
-            )
-            added += 1
-    else:
-        # Plain text: one YouTube URL per line
-        for line in lines:
-            raw_url = line.strip()
-            if not raw_url:
-                continue
-            m = re.search(r'(?:v=|/)([\w-]{11})(?:\?|&|$)', raw_url)
-            if not m:
-                errors += 1
-                continue
-            clean = 'https://www.youtube.com/watch?v=' + m.group(1)
-            existing = conn.execute(
-                "SELECT id FROM queue WHERE clean_url=? AND status != 'played'",
-                (clean,)
-            ).fetchone()
-            if existing:
-                errors += 1
-                continue
-            conn.execute(
-                "INSERT INTO queue (user_id, username, youtube_url, clean_url, title, ip_address) VALUES (?,?,?,?,?,?)",
-                (current_user.id, current_user.username, clean, clean, clean, 'import')
-            )
-            added += 1
+    for line in content.strip().split('\n'):
+        raw_url = line.strip()
+        if not raw_url:
+            continue
+        m = re.search(r'(?:v=|/)([\w-]{11})(?:\?|&|$)', raw_url)
+        if not m:
+            errors += 1
+            continue
+        clean = 'https://www.youtube.com/watch?v=' + m.group(1)
+        existing = conn.execute(
+            "SELECT id FROM queue WHERE clean_url=? AND status != 'played'",
+            (clean,)
+        ).fetchone()
+        if existing:
+            errors += 1
+            continue
+        conn.execute(
+            "INSERT INTO queue (user_id, username, youtube_url, clean_url, title, ip_address) VALUES (?,?,?,?,?,?)",
+            (current_user.id, current_user.username, clean, clean, clean, 'import')
+        )
+        added += 1
     conn.commit()
     conn.close()
     msg = f'Imported {added} song(s)'
