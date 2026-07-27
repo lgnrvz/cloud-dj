@@ -1170,6 +1170,10 @@ def import_csv():
     items = []
     for line in content.strip().split('\n'):
         raw_url = line.strip()
+        # Strip comments (#) — allows annotating links with song titles
+        comment_pos = raw_url.find('#')
+        if comment_pos >= 0:
+            raw_url = raw_url[:comment_pos].strip()
         if not raw_url:
             continue
         m = re.search(r'(?:v=|/)([\w-]{11})(?:\?|&|$)', raw_url)
