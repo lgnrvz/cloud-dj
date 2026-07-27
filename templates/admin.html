@@ -46,7 +46,9 @@
             border: 1px solid #1a1a2e;
             border-radius: 10px;
             overflow: hidden;
+            margin-bottom: 16px;
         }
+        .card:last-child { margin-bottom: 0; }
         .card-header {
             padding: 14px 18px;
             border-bottom: 1px solid #1a1a2e;
@@ -216,7 +218,7 @@
             </div>
 
             <!-- Import / Export (right below history) -->
-            <div class="card" style="margin-top:16px;">
+            <div class="card">
                 <div class="card-header">Import / Export</div>
                 <div style="padding:14px;display:flex;flex-direction:column;gap:10px;">
                     <button onclick="exportCSV()" style="padding:8px;border-radius:5px;border:none;background:#1db954;color:#000;font-family:Inter,sans-serif;font-size:0.75rem;font-weight:600;cursor:pointer;">Download Links</button>
