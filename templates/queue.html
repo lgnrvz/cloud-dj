@@ -433,6 +433,15 @@
                 </div>
             </div>
 
+            <!-- History Search -->
+            <div class="card" style="padding:10px 14px;">
+                <div style="font-size:0.65rem;color:#666;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;">Search History</div>
+                <div style="position:relative;">
+                    <input type="text" id="historySearch" style="width:100%;padding:7px 10px;border-radius:6px;border:1px solid #2a2a3a;background:#1a1a2a;color:#e0e0e8;font-family:'Inter',sans-serif;font-size:0.75rem;outline:none;" placeholder="Type to search..." autocomplete="off">
+                    <div id="searchSuggestions" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:#0d0d16;border:1px solid #2a2a3a;border-radius:6px;margin-top:4px;max-height:240px;overflow-y:auto;"></div>
+                </div>
+            </div>
+
             {% if current_user.is_admin %}
             <!-- Leaderboard -->
             <div class="card" id="leaderboardCard" style="display:none;">
@@ -1021,6 +1030,51 @@
     }
 
     // Auto-submit on paste into the quick-add input
+
+    // ─── History search with suggestions ───
+    const searchInput = document.getElementById('historySearch');
+    const suggestions = document.getElementById('searchSuggestions');
+    let searchTimer = null;
+
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            clearTimeout(searchTimer);
+            const q = searchInput.value.trim();
+            if (q.length < 2) { suggestions.style.display = 'none'; return; }
+            searchTimer = setTimeout(async () => {
+                try {
+                    const resp = await fetch('/search-history?q=' + encodeURIComponent(q));
+                    const d = await resp.json();
+                    if (!d.items.length) { suggestions.style.display = 'none'; return; }
+                    suggestions.innerHTML = d.items.map(item =>
+                        '<div onclick="addFromHistory(' + item.id + ', this)" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #1a1a2e;font-size:0.7rem;transition:.15s;" onmouseover="this.style.background=\'#1a1a2a\'" onmouseout="this.style.background=\'\'">'
+                        + '<div style="color:#e0e0e8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(item.title) + '</div>'
+                        + '<div style="color:#555;font-size:0.6rem;margin-top:1px;">' + escapeHtml(item.username) + '</div>'
+                        + '</div>'
+                    ).join('');
+                    suggestions.style.display = '';
+                } catch(e) { suggestions.style.display = 'none'; }
+            }, 250);
+        });
+        searchInput.addEventListener('blur', () => setTimeout(() => { suggestions.style.display = 'none'; }, 200));
+        searchInput.addEventListener('focus', () => { if (suggestions.children.length) suggestions.style.display = ''; });
+    }
+
+    function addFromHistory(id, el) {
+        fetch('/replay/' + id, { method: 'POST' })
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) {
+                    showToast('Added: ' + (d.title || 'to queue'));
+                    searchInput.value = '';
+                    suggestions.style.display = 'none';
+                    refreshQueueList();
+                } else if (d.error) {
+                    showToast(d.error, 'warn');
+                }
+            })
+            .catch(() => showToast('Failed to add', 'error'));
+    }
     document.getElementById('pasteInput').addEventListener('paste', function() {
         setTimeout(submitPaste, 50);
     });

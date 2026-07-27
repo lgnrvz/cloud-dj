@@ -133,6 +133,33 @@ def init_db():
         username TEXT DEFAULT '-',
         created_at TEXT DEFAULT (datetime('now'))
     )""")
+    # FTS5 index for history search
+    conn.execute(
+        "CREATE VIRTUAL TABLE IF NOT EXISTS queue_fts USING fts5("
+        "title, username, clean_url, content='queue', content_rowid='id')"
+    )
+    # Triggers to keep FTS index in sync
+    for trig in [
+        "CREATE TRIGGER IF NOT EXISTS queue_ai AFTER INSERT ON queue BEGIN"
+        "  INSERT INTO queue_fts(rowid, title, username, clean_url)"
+        "  VALUES (new.id, new.title, new.username, new.clean_url); END",
+        "CREATE TRIGGER IF NOT EXISTS queue_ad AFTER DELETE ON queue BEGIN"
+        "  INSERT INTO queue_fts(queue_fts, rowid, title, username, clean_url)"
+        "  VALUES ('delete', old.id, old.title, old.username, old.clean_url); END",
+        "CREATE TRIGGER IF NOT EXISTS queue_au AFTER UPDATE ON queue BEGIN"
+        "  INSERT INTO queue_fts(queue_fts, rowid, title, username, clean_url)"
+        "  VALUES ('delete', old.id, old.title, old.username, old.clean_url);"
+        "  INSERT INTO queue_fts(rowid, title, username, clean_url)"
+        "  VALUES (new.id, new.title, new.username, new.clean_url); END",
+    ]:
+        conn.execute(trig)
+    # Repopulate FTS from existing played songs
+    conn.execute("DELETE FROM queue_fts")
+    conn.execute(
+        "INSERT INTO queue_fts(rowid, title, username, clean_url) "
+        "SELECT id, title, username, clean_url FROM queue "
+        "WHERE status='played' AND title IS NOT NULL AND title != 'Loading...'"
+    )
     admin = conn.execute("SELECT id FROM users WHERE username='admin'").fetchone()
     if not admin:
         conn.execute("INSERT INTO users (name, username, password, is_admin) VALUES (?, ?, ?, ?)",
@@ -650,6 +677,26 @@ def stream_audio(item_id):
         }
     )
 
+@app.route('/search-history')
+@login_required
+def search_history():
+    """FTS5 search over played songs. Returns matching items for suggestion dropdown."""
+    q = request.args.get('q', '').strip()
+    if len(q) < 2:
+        return jsonify({'items': []})
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT q.id, q.title, q.username, q.clean_url FROM queue_fts f "
+        "JOIN queue q ON q.id = f.rowid "
+        "WHERE queue_fts MATCH ? AND q.status='played' "
+        "ORDER BY rank LIMIT 10",
+        (f'"{q}"*',)
+    ).fetchall()
+    conn.close()
+    return jsonify({
+        'items': [{'id': r['id'], 'title': r['title'], 'username': r['username']} for r in rows]
+    })
+
 @app.route('/direct-video')
 def direct_video():
     """Return a direct Google video URL for browser HTML5 <video> playback."""
@@ -673,6 +720,31 @@ def direct_video():
     except:
         pass
     return jsonify({'error': 'Failed to get video URL'}), 500
+
+@app.route('/replay/<int:item_id>', methods=['POST'])
+@login_required
+def replay_from_history(item_id):
+    """Re-queue a previously played song from history."""
+    conn = get_db()
+    item = conn.execute("SELECT * FROM queue WHERE id=? AND status='played'", (item_id,)).fetchone()
+    if not item:
+        conn.close()
+        return jsonify({'error': 'Not found'}), 404
+    existing = conn.execute(
+        "SELECT id FROM queue WHERE user_id=? AND clean_url=? AND status != 'played'",
+        (current_user.id, item['clean_url'])
+    ).fetchone()
+    if existing:
+        conn.close()
+        return jsonify({'error': 'Already in queue'}), 409
+    conn.execute(
+        "INSERT INTO queue (user_id, username, youtube_url, clean_url, title, ip_address) VALUES (?,?,?,?,?,?)",
+        (current_user.id, current_user.username, item['clean_url'], item['clean_url'], item['title'], request.remote_addr or 'unknown')
+    )
+    conn.commit(); conn.close()
+    if NOW_PLAYING.get('id') is None:
+        auto_advance()
+    return jsonify({'success': True, 'title': item['title']})
 
 # ─── PLAYER ADVANCEMENT ───
 
