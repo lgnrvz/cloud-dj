@@ -1155,9 +1155,16 @@ def import_csv():
         if existing:
             errors += 1
             continue
+        title = clean
+        try:
+            result = run_ytdl(['--print', 'title', '-s', clean])
+            if result.stdout.strip():
+                title = result.stdout.strip()
+        except:
+            pass
         conn.execute(
-            "INSERT INTO queue (user_id, username, youtube_url, clean_url, title, ip_address) VALUES (?,?,?,?,?,?)",
-            (current_user.id, current_user.username, clean, clean, clean, 'import')
+            "INSERT INTO queue (user_id, username, youtube_url, clean_url, title, status, ip_address) VALUES (?,?,?,?,?,?,?)",
+            (current_user.id, current_user.username, clean, clean, title, 'played', 'import')
         )
         added += 1
     conn.commit()
