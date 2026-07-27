@@ -686,15 +686,16 @@ def search_history():
         return jsonify({'items': []})
     conn = get_db()
     rows = conn.execute(
-        "SELECT q.id, q.title, q.username, q.clean_url FROM queue_fts f "
+        "SELECT q.id, q.title, q.clean_url FROM queue_fts f "
         "JOIN queue q ON q.id = f.rowid "
         "WHERE queue_fts MATCH ? "
-        "ORDER BY rank LIMIT 10",
+        "GROUP BY q.clean_url "
+        "ORDER BY MAX(rank) LIMIT 10",
         (f'"{q}"*',)
     ).fetchall()
     conn.close()
     return jsonify({
-        'items': [{'id': r['id'], 'title': r['title'], 'username': r['username']} for r in rows]
+        'items': [{'id': r['id'], 'title': r['title']} for r in rows]
     })
 
 @app.route('/direct-video')

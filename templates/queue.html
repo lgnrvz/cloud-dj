@@ -1049,7 +1049,6 @@
                     suggestions.innerHTML = d.items.map(item =>
                         '<div onclick="addFromHistory(' + item.id + ', this)" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #1a1a2e;font-size:0.7rem;transition:.15s;" onmouseover="this.style.background=\'#1a1a2a\'" onmouseout="this.style.background=\'\'">'
                         + '<div style="color:#e0e0e8;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;line-height:1.4;">' + escapeHtml(item.title) + '</div>'
-                        + '<div style="color:#555;font-size:0.6rem;margin-top:1px;">' + escapeHtml(item.username) + '</div>'
                         + '</div>'
                     ).join('');
                     suggestions.style.display = '';
