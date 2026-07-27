@@ -1,6 +1,8 @@
-venv/
-__pycache__/
+*.corrupt*
 *.db
 .DS_Store
+__pycache__/
+static/ph_clean_1000.txt
+static/ph_top_1000.txt
 .venv/
-.venv/
+venv/

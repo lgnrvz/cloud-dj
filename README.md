@@ -24,7 +24,7 @@
 
 ### ▶️ Auto-DJ
 - **Auto-fill** — when the queue is empty, shuffles through previously played songs
-- **Skip** — click Skip to jump to a new random track (no repeats of the last 8)
+- **Skip** — click Skip to jump to a new random track (full round-robin: no repeats until every song has played)
 - **Seamless transition** — when someone adds a new song, Auto-DJ finishes the current track first before handing off
 - **No history yet?** Skip button is hidden until there's something to shuffle
 - **Volume normalization** — automatic loudness smoothing via Web Audio DynamicsCompressor
@@ -45,7 +45,7 @@
 - **User management** — view all users, remove troublemakers
 - **Clear history** — wipe played songs (scores are preserved)
 - **Import / Export** — bulk-import YouTube links via `.csv` or `.txt` files; export all links for backup
-- **Background title resolution** — imported songs get their YouTube titles resolved automatically in the background with rate limiting and a live progress bar
+- **Instant import** — songs are added instantly with `#` comment text as titles (no API calls needed)
 - **# comment support** — annotate import `.txt` files with `#` comments (e.g., `https://youtube.com/... # Song Title`)
 - **Export format** — exports as `url #title` — ready to re-import
 - **Anti-abuse settings** — configure queue limit from the admin panel
