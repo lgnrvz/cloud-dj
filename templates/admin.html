@@ -429,9 +429,9 @@
                 // Show progress bar
                 prog.style.display = 'block';
                 bar.style.width = '0%';
-                status.textContent = '0 / ' + d.total + ' titles resolved';
+                status.textContent = '0 / ' + d.added + ' titles resolved';
                 msg.textContent = d.message;
-                const total = d.total;
+                const total = d.added;
                 const poll = setInterval(function() {
                     fetch('/admin/import-progress/' + d.job_id)
                         .then(r => r.json())
