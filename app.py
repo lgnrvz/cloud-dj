@@ -1115,6 +1115,66 @@ def reorder():
     conn.close()
     return jsonify({'success': True})
 
+@app.route('/admin/export-csv')
+@login_required
+def export_csv():
+    if not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized'}), 403
+    conn = get_db()
+    rows = conn.execute("SELECT id, title, clean_url, youtube_url, username, status, created_at FROM queue ORDER BY id DESC").fetchall()
+    conn.close()
+    import csv, io
+    out = io.StringIO()
+    w = csv.writer(out)
+    w.writerow(['id','title','url','username','status','date'])
+    for r in rows:
+        w.writerow([r['id'], r['title'], r['clean_url'] or r['youtube_url'], r['username'], r['status'], r['created_at']])
+    return Response(out.getvalue(), mimetype='text/csv', headers={'Content-Disposition': 'attachment; filename=cloud-dj-export.csv'})
+
+@app.route('/admin/import-csv', methods=['POST'])
+@login_required
+def import_csv():
+    if not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized'}), 403
+    csv_file = request.files.get('csv')
+    if not csv_file:
+        return jsonify({'error': 'No file uploaded'}), 400
+    import csv, io
+    content = csv_file.read().decode('utf-8')
+    reader = csv.DictReader(io.StringIO(content))
+    conn = get_db()
+    added = 0
+    errors = 0
+    for row in reader:
+        raw_url = (row.get('url') or row.get('clean_url') or row.get('youtube_url') or '').strip()
+        if not raw_url:
+            errors += 1
+            continue
+        title = (row.get('title') or 'Imported').strip()
+        # Normalize URL
+        m = re.search(r'(?:v=|/)([\w-]{11})(?:\?|&|$)', raw_url)
+        if not m:
+            errors += 1
+            continue
+        clean = 'https://www.youtube.com/watch?v=' + m.group(1)
+        existing = conn.execute(
+            "SELECT id FROM queue WHERE clean_url=? AND status != 'played'",
+            (clean,)
+        ).fetchone()
+        if existing:
+            errors += 1
+            continue
+        conn.execute(
+            "INSERT INTO queue (user_id, username, youtube_url, clean_url, title, ip_address) VALUES (?,?,?,?,?,?)",
+            (current_user.id, current_user.username, clean, clean, title, 'import')
+        )
+        added += 1
+    conn.commit()
+    conn.close()
+    msg = f'Imported {added} song(s)'
+    if errors: msg += f', {errors} skipped'
+    return jsonify({'success': True, 'message': msg, 'added': added})
+
 def fetch_title(item_id, url):
     """Get video title from yt-dlp in background."""
     try:
