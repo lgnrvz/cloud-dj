@@ -1,8 +1,51 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, Response, stream_with_context, session
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
-from werkzeug.security import generate_password_hash, check_password_hash
-import sqlite3, os, threading, subprocess, re, signal, random, time, sys
+import sqlite3, os, threading, subprocess, re, signal, random, time, sys, hashlib, secrets
+from base64 import b64encode
 from datetime import datetime, timedelta
+
+
+# Self-contained password hashing — compatible with werkzeug's pbkdf2:sha256 format
+# so existing databases with hashed passwords keep working.
+def generate_password_hash(password, method='pbkdf2:sha256', salt_length=16):
+    """Generate password hash. Compatible with werkzeug's pbkdf2:sha256 format."""
+    if not password:
+        raise ValueError('password required')
+    salt = secrets.token_hex(salt_length)
+    if method.startswith('pbkdf2:sha256'):
+        iterations = 600000
+        if method.count(':') > 1:
+            try:
+                iterations = int(method.rsplit(':', 1)[-1])
+            except (ValueError, IndexError):
+                pass
+        h = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), iterations)
+        h_b64 = b64encode(h).decode().rstrip('=')
+        return f'pbkdf2:sha256:{iterations}${salt}${h_b64}'
+    raise ValueError(f'unsupported method: {method}')
+
+
+def check_password_hash(pwhash, password):
+    """Check password against hash. Compatible with werkzeug's pbkdf2:sha256 format."""
+    if not pwhash or not password:
+        return False
+    try:
+        parts = pwhash.split('$')
+        if len(parts) != 3:
+            return False
+        method, salt, hash_val = parts
+        if not method.startswith('pbkdf2:sha256'):
+            return False
+        iterations = 600000
+        try:
+            iterations = int(method.rsplit(':', 1)[-1])
+        except (ValueError, IndexError):
+            pass
+        h = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), iterations)
+        h_b64 = b64encode(h).decode().rstrip('=')
+        return secrets.compare_digest(h_b64, hash_val)
+    except Exception:
+        return False
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24).hex()
