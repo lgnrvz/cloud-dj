@@ -423,12 +423,15 @@
     }).catch(() => {});
 
     function toggleSetting(name, btn) {
-        const on = btn.classList.contains('off');
-        btn.className = 'toggle-switch ' + (on ? 'on' : 'off');
-        const ep = name === 'scoring' ? '/admin/settings' : '/admin/settings/leaderboard';
-        const body = name === 'scoring' ? {scoring: on} : {show: on};
-        fetch(ep, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) })
-            .then(r => r.json()).catch(() => {});
+        const wasOff = btn.classList.contains('off');
+        const body = name === 'scoring' ? {scoring: wasOff} : {show: wasOff};
+        btn.className = 'toggle-switch ' + (wasOff ? 'on' : 'off');
+        fetch(name === 'scoring' ? '/admin/settings' : '/admin/settings/leaderboard', {
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+        }).then(r => r.json()).then(d => {
+            // Revert on failure
+            if (!d.success) btn.className = 'toggle-switch ' + (wasOff ? 'off' : 'on');
+        }).catch(() => btn.className = 'toggle-switch ' + (wasOff ? 'off' : 'on'));
     }
 
     /** Load current queue limit */
