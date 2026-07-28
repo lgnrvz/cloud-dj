@@ -423,7 +423,7 @@
     }).catch(() => {});
 
     function toggleSetting(name, btn) {
-        const on = btn.className === 'off';
+        const on = btn.classList.contains('off');
         btn.className = 'toggle-switch ' + (on ? 'on' : 'off');
         const ep = name === 'scoring' ? '/admin/settings' : '/admin/settings/leaderboard';
         const body = name === 'scoring' ? {scoring: on} : {show: on};
