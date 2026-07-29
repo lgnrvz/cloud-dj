@@ -503,18 +503,6 @@
     const statusDot = document.getElementById('playerStatusDot');
     const statusText = document.getElementById('playerStatusText');
 
-    // ─── Volume normalization ───
-    // Normalize loudness across tracks by adjusting volume per-track
-    // based on a simple reference level
-    let normalizer = { enabled: true };
-
-    function applyVolumeNormalization() {
-        // Gently reduce max volume to avoid sudden loudness spikes
-        // The DynamicsCompressor approach blocks audio when AudioContext is suspended,
-        // so we use video.volume instead — simpler, no autoplay issues
-        video.volume = 0.75;
-    }
-
     let currentPlayingId = null;
     let skipInProgress = false;
     let loadingNext = false;
@@ -595,7 +583,6 @@
 
                 try {
                     await playReady;
-                    applyVolumeNormalization();
                     await video.play();
                     setStatus('#1db954', 'Playing');
                 } catch (e) {
