@@ -6,9 +6,25 @@
     <p>Sign in to request songs and control the queue</p>
     <form method="POST">
         <input type="text" name="username" placeholder="Username" required>
-        <input type="password" name="password" placeholder="Password" required>
+        <div style="position:relative;">
+            <input type="password" name="password" id="passInput" placeholder="Password" required style="padding-right:36px;">
+            <span id="eyeToggle" onclick="togglePass()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;color:#555;font-size:1rem;user-select:none;">&#128065;</span>
+        </div>
         <button type="submit">Log In</button>
     </form>
+    <script>
+    function togglePass() {
+        const inp = document.getElementById('passInput');
+        const eye = document.getElementById('eyeToggle');
+        if (inp.type === 'password') {
+            inp.type = 'text';
+            eye.style.color = '#1db954';
+        } else {
+            inp.type = 'password';
+            eye.style.color = '#555';
+        }
+    }
+    </script>
     <div class="auth-link">No account? <a href="{{ url_for('signup') }}">Sign up here</a></div>
 </div>
 {% endblock %}
