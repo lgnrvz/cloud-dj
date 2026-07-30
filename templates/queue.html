@@ -1000,6 +1000,11 @@
     {# ─── Polling for ALL users (queue updates) ─── #}
     function safePoll() {
         fetch('/now-playing').then(r=>r.json()).then(np => {
+            // Update now-playing bar for all users
+            const nt = document.getElementById('nowTrack');
+            const nm = document.getElementById('nowMeta');
+            if (nt) nt.textContent = np.title || 'Nothing playing';
+            if (nm) nm.textContent = np.username || '-';
             const qc = document.getElementById('queueCount');
             if (qc) qc.textContent = (np.queue_count || 0) + ' in queue';
             if (lastQueueCount !== -1 && lastQueueCount !== np.queue_count) {
