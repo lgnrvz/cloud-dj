@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Queue &middot; Cloud-DJ</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         html, body { width: 100%; overflow-x: hidden; }
@@ -375,6 +376,21 @@
                 </div>
                 <div id="suggestedList">
                     <div class="empty" style="padding:20px;text-align:center;color:#333;font-size:0.75rem;">Loading...</div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if chat_enabled %}
+            <!-- Live Chat -->
+            <div class="card" id="chatCard" style="display:flex;flex-direction:column;">
+                <div class="card-header">
+                    <span>Live Chat</span>
+                    <span id="chatCount" style="color:#444;font-size:0.65rem;">0</span>
+                </div>
+                <div id="chatMessages" style="height:250px;overflow-y:auto;padding:8px 12px;display:flex;flex-direction:column;gap:4px;font-size:0.75rem;"></div>
+                <div style="display:flex;gap:4px;padding:8px 12px;border-top:1px solid #1a1a2e;">
+                    <input type="text" id="chatInput" placeholder="Type a message..." style="flex:1;padding:6px 8px;border-radius:4px;border:1px solid #2a2a3a;background:#1a1a2a;color:#e0e0e8;font-family:Inter,sans-serif;font-size:0.75rem;outline:none;">
+                    <button id="chatSendBtn" onclick="sendChatMsg()" style="padding:6px 10px;border-radius:4px;border:none;background:#1db954;color:#000;font-weight:600;cursor:pointer;font-size:0.7rem;font-family:Inter,sans-serif;">Send</button>
                 </div>
             </div>
             {% endif %}
@@ -1339,5 +1355,68 @@
             .catch(() => {});
     }
     </script>
+
+    {% if chat_enabled %}
+    <script>
+    /** Convert URLs to clickable links (opens in new tab) */
+    function linkify(text) {
+        var urlPattern = /(https?:\/\/[^\s<]+)/g;
+        return text.replace(urlPattern, '<a href="$1" target="_blank" rel="noopener noreferrer" style="color:#1db954;text-decoration:underline;">$1</a>');
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const CHAT_ENABLED = true;
+        const socket = io(window.location.origin, {
+            transports: ['websocket', 'polling'],
+            autoConnect: true
+        });
+        const chatEl = document.getElementById('chatMessages');
+        const chatInput = document.getElementById('chatInput');
+        const chatCount = document.getElementById('chatCount');
+        let msgCount = 0;
+
+        socket.on('connect', function() {
+            console.log('[chat] connected');
+        });
+
+        socket.on('chat_message', function(msg) {
+            msgCount++;
+            if (chatCount) chatCount.textContent = msgCount;
+            const div = document.createElement('div');
+            div.style.cssText = 'display:flex;gap:4px;align-items:flex-start;line-height:1.3;';
+            // Time
+            const timeSpan = document.createElement('span');
+            timeSpan.style.cssText = 'color:#444;font-size:0.6rem;flex-shrink:0;margin-top:1px;';
+            timeSpan.textContent = msg.time || '';
+            div.appendChild(timeSpan);
+            // Username
+            const nameSpan = document.createElement('span');
+            nameSpan.style.cssText = 'font-weight:600;flex-shrink:0;color:' + (msg.is_admin ? '#1db954' : '#888') + ';';
+            nameSpan.textContent = msg.username + ':';
+            div.appendChild(nameSpan);
+            // Message with linkify
+            const msgSpan = document.createElement('span');
+            msgSpan.style.cssText = 'word-break:break-word;color:#c8c8d0;';
+            msgSpan.innerHTML = linkify(msg.message);
+            div.appendChild(msgSpan);
+            chatEl.appendChild(div);
+            chatEl.scrollTop = chatEl.scrollHeight;
+        });
+
+        function sendChatMsg() {
+            const text = chatInput.value.trim();
+            if (!text) return;
+            socket.emit('send_message', { message: text });
+            chatInput.value = '';
+        }
+
+        chatInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') sendChatMsg();
+        });
+
+        window.sendChatMsg = sendChatMsg;
+    });
+    </script>
+    {% endif %}
 </body>
 </html>

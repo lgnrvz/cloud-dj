@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, Response, stream_with_context, session
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+from flask_socketio import SocketIO, emit, join_room
 import sqlite3, os, threading, subprocess, re, signal, random, time, sys, hashlib, secrets
 from base64 import b64encode
 from datetime import datetime, timedelta
@@ -51,6 +52,9 @@ app = Flask(__name__)
 app.secret_key = os.urandom(24).hex()
 app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=365)
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=365)
+
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
@@ -61,6 +65,8 @@ NOW_PLAYING = {'id': None, 'url': None, 'title': 'Nothing playing', 'username': 
 SCORING_ENABLED = False  # Videoke scoring toggle
 SHOW_LEADERBOARD = False  # Leaderboard visibility toggle
 SUGGESTED_ENABLED = False  # Suggested songs toggle
+CHAT_ENABLED = True  # Live chat toggle
+CHAT_MESSAGES = []  # In-memory chat history (max 100)
 
 # Anti-abuse settings
 MAX_CONSECUTIVE_QUEUE = 16  # Max songs a user can add consecutively (1-16)
@@ -450,7 +456,7 @@ def queue():
     # Auto-start: if nothing is playing but there are pending items, advance
     if NOW_PLAYING.get('id') is None:
         _auto_start()
-    return render_template('queue.html', items=items, played=played, loved=loved, loved_urls=loved_urls, now=_enrich_now(dict(NOW_PLAYING)), server_url=request.host_url.rstrip('/'), suggested_enabled=SUGGESTED_ENABLED)
+    return render_template('queue.html', items=items, played=played, loved=loved, loved_urls=loved_urls, now=_enrich_now(dict(NOW_PLAYING)), server_url=request.host_url.rstrip('/'), suggested_enabled=SUGGESTED_ENABLED, chat_enabled=CHAT_ENABLED)
 
 @app.route('/loved-songs')
 @login_required
@@ -1118,6 +1124,19 @@ def admin_settings_suggested():
     return jsonify({'show': SUGGESTED_ENABLED})
 
 
+@app.route('/admin/settings/chat', methods=['GET', 'POST'])
+@login_required
+def admin_settings_chat():
+    """Get or toggle live chat."""
+    if not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized'}), 403
+    global CHAT_ENABLED
+    if request.method == 'POST':
+        CHAT_ENABLED = request.json.get('show', False)
+        return jsonify({'success': True, 'show': CHAT_ENABLED})
+    return jsonify({'show': CHAT_ENABLED})
+
+
 @app.route('/admin/change-password', methods=['POST'])
 @login_required
 def admin_change_password():
@@ -1338,5 +1357,36 @@ def fetch_title(item_id, url):
     except:
         pass
 
+
+# ─── SOCKET.IO EVENTS (Live Chat) ───
+
+@socketio.on('connect')
+def handle_connect():
+    join_room('chat')
+    # Send recent messages to the newly connected client
+    for msg in CHAT_MESSAGES[-50:]:
+        emit('chat_message', msg)
+
+
+@socketio.on('send_message')
+def handle_send_message(data):
+    if not current_user.is_authenticated:
+        return
+    msg = data.get('message', '').strip()
+    if not msg or len(msg) > 500:
+        return
+    entry = {
+        'username': current_user.username,
+        'message': msg,
+        'is_admin': current_user.is_admin,
+        'time': datetime.now().strftime('%H:%M')
+    }
+    CHAT_MESSAGES.append(entry)
+    # Keep only last 100
+    while len(CHAT_MESSAGES) > 100:
+        CHAT_MESSAGES.pop(0)
+    emit('chat_message', entry, room='chat')
+
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5050, debug=True, threaded=True)
+    socketio.run(app, host='0.0.0.0', port=5050, debug=True, allow_unsafe_werkzeug=True)
