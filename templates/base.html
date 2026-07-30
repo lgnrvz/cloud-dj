@@ -13,6 +13,8 @@
             background: #07070d;
             color: #c8c8d0;
             min-height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
         .navbar {
             background: #0d0d16;
@@ -120,7 +122,7 @@
             {% endif %}
         </div>
     </nav>
-    <div class="container" style="display:block;max-width:800px;">
+    <div class="container" style="flex:1;max-width:800px;width:100%;margin:0 auto;padding:20px;">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% for category, message in messages %}
                 <div class="flash {{ category }}">{{ message }}</div>
@@ -139,6 +141,7 @@
             font-size: 0.65rem;
             color: #333;
             border-top: 1px solid #111122;
+            margin-top: auto;
         }
         .footer a { color: #555; text-decoration: none; transition: .2s; }
         .footer a:hover { color: #1db954; }
