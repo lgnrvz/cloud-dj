@@ -1257,7 +1257,8 @@
             const resp = await fetch('/suggested');
             if (!resp.ok) return;
             const d = await resp.json();
-            document.getElementById('suggestedCount').textContent = d.items.length;
+            const countLabel = document.getElementById('suggestedCount');
+            if (countLabel) countLabel.textContent = '60s';
             const list = document.getElementById('suggestedList');
             if (d.items.length === 0) {
                 list.innerHTML = '<div class="empty" style="padding:20px;text-align:center;color:#333;font-size:0.75rem;">No suggestions yet</div>';
@@ -1301,7 +1302,17 @@
     // Initial load + refresh every 60s (only if card is visible)
     if (document.getElementById('suggestedCard')) {
         refreshSuggested();
-        setInterval(refreshSuggested, 60000);
+        let suggestedTimer = 60;
+        const timerLabel = document.getElementById('suggestedCount');
+        function tickTimer() {
+            suggestedTimer--;
+            if (timerLabel) timerLabel.textContent = suggestedTimer + 's';
+            if (suggestedTimer <= 0) {
+                suggestedTimer = 60;
+                refreshSuggested();
+            }
+        }
+        setInterval(tickTimer, 1000);
     }
 
     /** Remove a queue item (admin only) */
