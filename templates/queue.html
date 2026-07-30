@@ -410,6 +410,7 @@
 
         <!-- Middle Column -->
         <div class="mid-col">
+            {% if current_user.is_admin %}
             <!-- Now Playing -->
             <div class="now-playing">
                 <span class="indicator"></span>
@@ -419,13 +420,12 @@
                     <div class="meta" id="nowMeta">{{ now.username }}</div>
                 </div>
 
-                {% if current_user.is_admin %}
                 <div class="player-controls">
                     <button class="skip-btn hidden"
                             onclick="skipTrack()" id="skipBtn" title="Skip to next track">Skip</button>
                 </div>
-                {% endif %}
             </div>
+            {% endif %}
 
             {% if current_user.is_admin %}
             <!-- Status row (replaces player-bar) -->
