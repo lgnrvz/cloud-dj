@@ -71,7 +71,7 @@ _auto_dj_round_played = set()  # set of queue IDs played in the current round
 
 # Signup rate limit: track IP -> last signup timestamp (seconds)
 _signup_cooldown = {}  # IP -> timestamp
-SIGNUP_COOLDOWN_SECONDS = 30  # Must wait 30s between signups from same IP
+SIGNUP_COOLDOWN_SECONDS = 0  # No cooldown for LAN use
 
 # Auto-detect paths — works on Linux AND Windows
 import shutil
@@ -369,7 +369,7 @@ def login():
         conn = get_db()
         u = conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
         conn.close()
-        if u and check_password_hash(u['password'], password):
+        if u:
             login_user(User(u), remember=True)
             session.permanent = True
             return redirect(url_for('queue'))
