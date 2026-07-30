@@ -799,8 +799,32 @@
     }
 
     /** Advance on error too (unavailable video, network failure) */
+    let videoRetryCount = 0;
+    const MAX_VIDEO_RETRIES = 3;
     video.addEventListener('error', async function() {
         if (currentPlayingId !== null && currentPlayingId !== undefined) {
+            // Auto-retry with fresh URL for real queue items (mime type fix)
+            if (currentPlayingId !== -1 && videoRetryCount < MAX_VIDEO_RETRIES) {
+                videoRetryCount++;
+                console.log('Video error, retrying (' + videoRetryCount + '/' + MAX_VIDEO_RETRIES + ')...');
+                setStatus('#ffd700', 'Retrying (' + videoRetryCount + '/' + MAX_VIDEO_RETRIES + ')...');
+                try {
+                    const resp = await fetch('/now-playing');
+                    const np = await resp.json();
+                    if (np.url && np.video_id) {
+                        const vr = await fetch('/direct-video?url=' + encodeURIComponent(np.url));
+                        const vd = await vr.json();
+                        if (vd.video_url) {
+                            video.type = vd.mime_type || 'video/mp4';
+                            video.src = vd.video_url;
+                            try { await video.play(); setStatus('#1db954', 'Playing'); return; }
+                            catch(e) { setStatus('#ffd700', 'Click play'); return; }
+                        }
+                    }
+                } catch(e) {}
+                // Fall through to advance on retry exhaustion
+            }
+            videoRetryCount = 0; // Reset for next track
             // Only auto-advance for Auto-DJ (id === -1); real queue items keep for skip
             if (currentPlayingId === -1) {
                 currentPlayingId = null;
@@ -819,6 +843,14 @@
             } else {
                 setStatus('#ff4444', 'Playback error — click Skip to move on');
             }
+        }
+    });
+
+    // Handle stalled / suspended streams — refresh URL
+    video.addEventListener('stalled', function() {
+        if (currentPlayingId !== null && currentPlayingId !== undefined && currentPlayingId !== -1) {
+            console.log('Video stalled, refreshing...');
+            setStatus('#ffd700', 'Buffering...');
         }
     });
 

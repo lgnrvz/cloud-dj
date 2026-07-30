@@ -744,27 +744,40 @@ def search_history():
 
 @app.route('/direct-video')
 def direct_video():
-    """Return a direct Google video URL for browser HTML5 <video> playback."""
+    """Return a direct Google video URL for browser HTML5 <video> playback.
+    Tries multiple formats as fallback, returns a fresh URL each call."""
     url = request.args.get('url', '')
     m = re.search(r'(?:v=|/)([\w-]{11})(?:\?|&|$)', url)
     if not m:
         return jsonify({'error': 'Invalid URL'}), 400
-    try:
-        # Build yt-dlp command (same logic as run_ytdl)
-        ytdl_cmd = [YTDLP]
-        if NODE_PATH and NODE_PATH != 'node':
-            ytdl_cmd += ['--js-runtimes', f'node:{NODE_PATH}']
-        ytdl_cmd += ['-g', '-f', '18', url]
-        result = subprocess.run(
-            ytdl_cmd,
-            capture_output=True, text=True, timeout=30
-        )
-        video_url = result.stdout.strip().split('\n')[0]
-        if video_url:
-            return jsonify({'video_url': video_url, 'video_id': m.group(1), 'mime_type': 'video/mp4'})
-    except:
-        pass
-    return jsonify({'error': 'Failed to get video URL'}), 500
+    video_id = m.group(1)
+
+    # Try formats in order: 18 (360p MP4), 22 (720p MP4), bestvideo+bestaudio
+    formats = ['18', '22', 'bestvideo+bestaudio/best']
+    last_error = None
+
+    for fmt in formats:
+        try:
+            ytdl_cmd = [YTDLP]
+            if NODE_PATH and NODE_PATH != 'node':
+                ytdl_cmd += ['--js-runtimes', f'node:{NODE_PATH}']
+            ytdl_cmd += ['-g', '-f', fmt, url]
+            result = subprocess.run(
+                ytdl_cmd,
+                capture_output=True, text=True, timeout=30
+            )
+            video_url = result.stdout.strip().split('\n')[0]
+            if video_url:
+                mime = 'video/mp4'
+                if 'm3u8' in video_url:
+                    mime = 'application/x-mpegURL'
+                return jsonify({'video_url': video_url, 'video_id': video_id, 'mime_type': mime})
+        except subprocess.TimeoutExpired:
+            last_error = 'Timeout'
+        except Exception as e:
+            last_error = str(e)
+
+    return jsonify({'error': f'Failed to get video URL: {last_error}'}), 500
 
 @app.route('/replay/<int:item_id>', methods=['POST'])
 @login_required
@@ -966,8 +979,29 @@ def remove_item(item_id):
             'auto_advance': True,
             'now': _enrich_now(dict(NOW_PLAYING))
         })
-
     return jsonify({'success': True})
+
+
+@app.route('/admin/queue')
+@login_required
+def admin_queue():
+    """JSON endpoint for admin queue list (non-played items)."""
+    if not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized'}), 403
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT id, title, username, clean_url, youtube_url, created_at "
+        "FROM queue WHERE status != 'played' ORDER BY priority DESC, id ASC"
+    ).fetchall()
+    conn.close()
+    return jsonify({
+        'items': [{
+            'id': r['id'], 'title': r['title'], 'username': r['username'],
+            'clean_url': r['clean_url'], 'youtube_url': r['youtube_url'],
+            'created_at': r['created_at']
+        } for r in rows]
+    })
+
 
 @app.route('/admin/clear-history', methods=['POST'])
 @login_required
