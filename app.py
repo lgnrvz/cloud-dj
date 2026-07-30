@@ -195,13 +195,11 @@ def init_db():
         "  VALUES (new.id, new.title, new.username, new.clean_url); END",
     ]:
         conn.execute(trig)
-    # Repopulate FTS from existing played songs
-    conn.execute("DELETE FROM queue_fts")
-    conn.execute(
-        "INSERT INTO queue_fts(rowid, title, username, clean_url) "
-        "SELECT id, title, username, clean_url FROM queue "
-        "WHERE status='played' AND title IS NOT NULL AND title != 'Loading...'"
-    )
+    # Repopulate FTS from existing played songs using safe rebuild
+    try:
+        conn.execute("INSERT INTO queue_fts(queue_fts) VALUES('rebuild')")
+    except sqlite3.OperationalError:
+        pass  # No FTS table yet — will be populated by triggers
     admin = conn.execute("SELECT id FROM users WHERE username='admin'").fetchone()
     if not admin:
         conn.execute("INSERT INTO users (name, username, password, is_admin) VALUES (?, ?, ?, ?)",
