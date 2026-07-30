@@ -26,10 +26,11 @@
         .brand span { color: #1db954; }
         .navbar a { color: #888; text-decoration: none; margin-left: 18px; font-size: 0.8rem; transition: .2s; }
         .navbar a:hover { color: #fff; }
-        .container { max-width: 1200px; margin: 0 auto; padding: 20px; display: flex; gap: 20px; align-items: flex-start; }
-        .main-col { flex: 4; min-width: 0; }
-        .side-col { flex: 1; min-width: 0; width: auto; }
-        @media (max-width: 800px) { .container { flex-direction: column; } .side-col { width: auto; } }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; display: flex; gap: 16px; align-items: flex-start; }
+        .main-col { flex: 3; min-width: 0; }
+        .mid-col { flex: 5; min-width: 0; }
+        .side-col { flex: 2; min-width: 0; width: auto; }
+        @media (max-width: 1000px) { .container { flex-direction: column; } .main-col, .mid-col, .side-col { width: 100%; } }
 
         /* ─── Mobile Responsive ─── */
         @media (max-width: 768px) {
@@ -347,8 +348,40 @@
         </div>
     </nav>
     <div class="container">
-        <!-- Main Column -->
+        <!-- Left Column -->
         <div class="main-col">
+            <!-- Flash messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endwith %}
+
+            <!-- History Search -->
+            <div class="card" style="padding:10px 14px;overflow:visible;">
+                <div style="font-size:0.65rem;color:#666;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;">Search</div>
+                <div style="position:relative;">
+                    <input type="text" id="historySearch" style="width:100%;padding:7px 10px;border-radius:6px;border:1px solid #2a2a3a;background:#1a1a2a;color:#e0e0e8;font-family:'Inter',sans-serif;font-size:0.75rem;outline:none;" placeholder="Type to search..." autocomplete="off">
+                    <div id="searchSuggestions" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:999;background:#0d0d16;border:1px solid #2a2a3a;border-radius:6px;margin-top:4px;max-height:240px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.6);"></div>
+                </div>
+            </div>
+
+            {% if suggested_enabled %}
+            <!-- Suggested Songs -->
+            <div class="card" id="suggestedCard">
+                <div class="card-header">
+                    <span>Suggested Songs</span>
+                    <span id="suggestedCount" style="color:#444;font-size:0.65rem;">0</span>
+                </div>
+                <div id="suggestedList">
+                    <div class="empty" style="padding:20px;text-align:center;color:#333;font-size:0.75rem;">Loading...</div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Middle Column -->
+        <div class="mid-col">
             <!-- Now Playing -->
             <div class="now-playing">
                 <span class="indicator"></span>
@@ -421,28 +454,6 @@
                     {% endfor %}
                 {% endif %}
             </div>
-
-            <!-- History Search -->
-            <div class="card" style="padding:10px 14px;overflow:visible;">
-                <div style="font-size:0.65rem;color:#666;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;">Search</div>
-                <div style="position:relative;">
-                    <input type="text" id="historySearch" style="width:100%;padding:7px 10px;border-radius:6px;border:1px solid #2a2a3a;background:#1a1a2a;color:#e0e0e8;font-family:'Inter',sans-serif;font-size:0.75rem;outline:none;" placeholder="Type to search..." autocomplete="off">
-                    <div id="searchSuggestions" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:999;background:#0d0d16;border:1px solid #2a2a3a;border-radius:6px;margin-top:4px;max-height:240px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.6);"></div>
-                </div>
-            </div>
-
-            {% if suggested_enabled %}
-            <!-- Suggested Songs -->
-            <div class="card" id="suggestedCard">
-                <div class="card-header">
-                    <span>Suggested Songs</span>
-                    <span id="suggestedCount" style="color:#444;font-size:0.65rem;">0</span>
-                </div>
-                <div id="suggestedList">
-                    <div class="empty" style="padding:20px;text-align:center;color:#333;font-size:0.75rem;">Loading...</div>
-                </div>
-            </div>
-            {% endif %}
         </div>
 
         <!-- Side Column -->
