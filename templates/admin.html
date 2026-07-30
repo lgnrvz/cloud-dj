@@ -268,6 +268,10 @@
                         <span>Leaderboard</span>
                         <button id="lbToggle" class="toggle-switch off" onclick="toggleSetting('leaderboard', this)"></button>
                     </div>
+                    <div class="toggle-row">
+                        <span>Suggested Songs</span>
+                        <button id="suggestedToggle" class="toggle-switch off" onclick="toggleSetting('suggested', this)"></button>
+                    </div>
                     <div class="toggle-row" style="border-bottom:none;">
                         <span style="font-size:0.75rem;">Queue Limit (1-16)</span>
                         <div style="display:flex;align-items:center;gap:8px;">
@@ -422,11 +426,21 @@
         btn.className = 'toggle-switch ' + (d.show ? 'on' : 'off');
     }).catch(() => {});
 
+    // Load suggested songs setting
+    fetch('/admin/settings/suggested').then(r=>r.json()).then(d => {
+        const btn = document.getElementById('suggestedToggle');
+        btn.className = 'toggle-switch ' + (d.show ? 'on' : 'off');
+    }).catch(() => {});
+
     function toggleSetting(name, btn) {
         const wasOff = btn.classList.contains('off');
-        const body = name === 'scoring' ? {scoring: wasOff} : {show: wasOff};
+        let url = '/admin/settings';
+        let body = {};
+        if (name === 'scoring') { body = {scoring: wasOff}; }
+        else if (name === 'leaderboard') { url = '/admin/settings/leaderboard'; body = {show: wasOff}; }
+        else if (name === 'suggested') { url = '/admin/settings/suggested'; body = {show: wasOff}; }
         btn.className = 'toggle-switch ' + (wasOff ? 'on' : 'off');
-        fetch(name === 'scoring' ? '/admin/settings' : '/admin/settings/leaderboard', {
+        fetch(url, {
             method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
         }).then(r => r.json()).then(d => {
             // Revert on failure

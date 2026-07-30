@@ -60,6 +60,7 @@ DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database.db')
 NOW_PLAYING = {'id': None, 'url': None, 'title': 'Nothing playing', 'username': '-', 'is_auto_dj': False, 'has_history': False}
 SCORING_ENABLED = False  # Videoke scoring toggle
 SHOW_LEADERBOARD = False  # Leaderboard visibility toggle
+SUGGESTED_ENABLED = False  # Suggested songs toggle
 
 # Anti-abuse settings
 MAX_CONSECUTIVE_QUEUE = 16  # Max songs a user can add consecutively (1-16)
@@ -449,7 +450,7 @@ def queue():
     # Auto-start: if nothing is playing but there are pending items, advance
     if NOW_PLAYING.get('id') is None:
         _auto_start()
-    return render_template('queue.html', items=items, played=played, loved=loved, loved_urls=loved_urls, now=_enrich_now(dict(NOW_PLAYING)), server_url=request.host_url.rstrip('/'))
+    return render_template('queue.html', items=items, played=played, loved=loved, loved_urls=loved_urls, now=_enrich_now(dict(NOW_PLAYING)), server_url=request.host_url.rstrip('/'), suggested_enabled=SUGGESTED_ENABLED)
 
 @app.route('/loved-songs')
 @login_required
@@ -851,6 +852,28 @@ def replay_from_history(item_id):
         auto_advance()
     return jsonify({'success': True, 'title': item['title']})
 
+
+@app.route('/suggested')
+@login_required
+def suggested():
+    """Return 10 random songs from history for the suggested card."""
+    conn = get_db()
+    # Get played songs, excluding any already in the queue
+    rows = conn.execute(
+        "SELECT id, title, username, clean_url FROM queue "
+        "WHERE status='played' AND clean_url NOT IN "
+        "(SELECT clean_url FROM queue WHERE status != 'played') "
+        "GROUP BY clean_url ORDER BY RANDOM() LIMIT 10"
+    ).fetchall()
+    conn.close()
+    return jsonify({
+        'items': [{
+            'id': r['id'], 'title': r['title'],
+            'username': r['username'], 'clean_url': r['clean_url']
+        } for r in rows]
+    })
+
+
 # ─── PLAYER ADVANCEMENT ───
 
 @app.route('/advance', methods=['POST'])
@@ -1080,6 +1103,20 @@ def admin_settings_consecutive():
         _last_adder = {'username': None, 'count': 0, 'last_time': 0}
         return jsonify({'success': True, 'limit': MAX_CONSECUTIVE_QUEUE})
     return jsonify({'limit': MAX_CONSECUTIVE_QUEUE})
+
+
+@app.route('/admin/settings/suggested', methods=['GET', 'POST'])
+@login_required
+def admin_settings_suggested():
+    """Get or toggle suggested songs."""
+    if not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized'}), 403
+    global SUGGESTED_ENABLED
+    if request.method == 'POST':
+        SUGGESTED_ENABLED = request.json.get('show', False)
+        return jsonify({'success': True, 'show': SUGGESTED_ENABLED})
+    return jsonify({'show': SUGGESTED_ENABLED})
+
 
 @app.route('/admin/change-password', methods=['POST'])
 @login_required

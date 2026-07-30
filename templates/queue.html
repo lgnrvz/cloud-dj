@@ -469,6 +469,19 @@
             </div>
             {% endif %}
 
+            {% if suggested_enabled %}
+            <!-- Suggested Songs -->
+            <div class="card" id="suggestedCard">
+                <div class="card-header">
+                    <span>Suggested Songs</span>
+                    <span id="suggestedCount" style="color:#444;font-size:0.65rem;">0</span>
+                </div>
+                <div id="suggestedList">
+                    <div class="empty" style="padding:20px;text-align:center;color:#333;font-size:0.75rem;">Loading...</div>
+                </div>
+            </div>
+            {% endif %}
+
             <!-- Loved Songs -->
             <div class="card">
                 <div class="card-header"><span>&#9829; Loved Songs</span><span id="lovedCount">{{ loved|length }}</span></div>
@@ -1237,6 +1250,59 @@
         }
     }
     setInterval(updateLoadingTitles, 6000);
+
+    /** Refresh suggested songs from history */
+    async function refreshSuggested() {
+        try {
+            const resp = await fetch('/suggested');
+            if (!resp.ok) return;
+            const d = await resp.json();
+            document.getElementById('suggestedCount').textContent = d.items.length;
+            const list = document.getElementById('suggestedList');
+            if (d.items.length === 0) {
+                list.innerHTML = '<div class="empty" style="padding:20px;text-align:center;color:#333;font-size:0.75rem;">No suggestions yet</div>';
+                return;
+            }
+            list.innerHTML = d.items.map(item =>
+                '<div class="loved-item" style="padding:8px 12px;">'
+                + '<div class="title" style="font-size:0.75rem;">' + escapeHtml(item.title) + '</div>'
+                + '<div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">'
+                + '<button class="add-btn" style="font-size:0.65rem;padding:2px 6px;" onclick="addSuggested(' + item.id + ', this)">+</button>'
+                + '</div>'
+                + '</div>'
+            ).join('');
+        } catch(e) {}
+    }
+
+    /** Add a suggested song to queue via replay */
+    function addSuggested(id, btn) {
+        btn.disabled = true;
+        btn.textContent = '...';
+        fetch('/replay/' + id, { method: 'POST' })
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) {
+                    btn.textContent = '&#10003;';
+                    btn.style.color = '#1db954';
+                    setTimeout(() => { btn.disabled = false; btn.textContent = '+'; btn.style.color = ''; }, 2000);
+                    refreshQueueList();
+                } else {
+                    btn.textContent = '!';
+                    btn.style.color = '#ff4444';
+                    setTimeout(() => { btn.disabled = false; btn.textContent = '+'; btn.style.color = ''; }, 2000);
+                }
+            })
+            .catch(() => {
+                btn.disabled = false;
+                btn.textContent = '+';
+            });
+    }
+
+    // Initial load + refresh every 60s (only if card is visible)
+    if (document.getElementById('suggestedCard')) {
+        refreshSuggested();
+        setInterval(refreshSuggested, 60000);
+    }
 
     /** Remove a queue item (admin only) */
     function removeQueueItem(btn) {
