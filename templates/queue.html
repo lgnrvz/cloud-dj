@@ -404,6 +404,9 @@
                             </div>
                         </div>
                         <div class="actions">
+                            {% if current_user.is_admin %}
+                            <button class="del-btn" onclick="removeQueueItem({{ item.id }}, '{{ (item.title or 'Loading...')|e }}')" title="Remove from queue">&times;</button>
+                            {% endif %}
                             <button class="love-btn {% if item.clean_url in loved_urls %}loved{% endif %}" onclick="toggleLove({{ item.id }}, this)">{% if item.clean_url in loved_urls %}&#9829;{% else %}&#9825;{% endif %}</button>
                         </div>
                     </div>
@@ -1226,6 +1229,22 @@
         }
     }
     setInterval(updateLoadingTitles, 6000);
+
+    /** Remove a queue item (admin only) */
+    function removeQueueItem(id, title) {
+        if (!confirm('Remove "' + title + '" from queue?')) return;
+        fetch('/admin/remove/' + id, { method: 'POST' })
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) {
+                    if (d.auto_advance) {
+                        // Currently playing item was removed — UI will auto-update via poll
+                    }
+                    refreshQueueList();
+                }
+            })
+            .catch(() => {});
+    }
     </script>
 </body>
 </html>

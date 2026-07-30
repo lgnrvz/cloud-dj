@@ -197,34 +197,8 @@
             </div>
         </div>
 
-        <!-- Left column: Queue + History + Import/Export -->
+        <!-- Left column: History + Import/Export -->
         <div>
-            <!-- Queue section (Admin only — with remove buttons) -->
-            <div class="card">
-                <h2 style="display:flex;justify-content:space-between;align-items:center;">
-                    <span>Queue</span>
-                    <span style="color:#444;font-size:0.7rem;font-weight:400;" id="adminQueueCount">{{ items|length }}</span>
-                </h2>
-                <div id="adminQueueList">
-                    {% if items|length == 0 %}
-                    <div class="empty">Queue is empty</div>
-                    {% else %}
-                    {% for item in items %}
-                    <div class="history-item" data-id="{{ item.id }}">
-                        <div class="info">
-                            <div class="title">{{ item.title or 'Loading...' }}</div>
-                            <div class="sub"><span>{{ item.username }}</span> <span>{{ item.created_at }}</span></div>
-                        </div>
-                        <div style="display:flex;align-items:center;gap:3px;">
-                            <a href="{{ item.clean_url or item.youtube_url }}" target="_blank" class="view-btn" style="font-size:0.6rem;padding:3px 6px;">View</a>
-                            <button class="del-btn" onclick="removeQueueItem({{ item.id }}, '{{ (item.title or 'Loading...')|e }}')" title="Remove from queue">&times;</button>
-                        </div>
-                    </div>
-                    {% endfor %}
-                    {% endif %}
-                </div>
-            </div>
-
             <div class="card">
                 <h2>History</h2>
                 <div style="padding:4px 18px 0;display:flex;justify-content:space-between;align-items:center;">
@@ -485,48 +459,6 @@
             .then(() => loadHistory(1))
             .catch(() => {});
     }
-
-    /** Remove a single queue item (admin only) */
-    function removeQueueItem(id, title) {
-        if (!confirm('Remove "' + title + '" from queue?')) return;
-        fetch('/admin/remove/' + id, { method: 'POST' })
-            .then(r => r.json())
-            .then(d => {
-                if (d.success) {
-                    refreshQueueList();
-                }
-            })
-            .catch(() => {});
-    }
-
-    /** Refresh admin queue list via JSON endpoint */
-    function refreshQueueList() {
-        fetch('/admin/queue')
-            .then(r => r.json())
-            .then(d => {
-                const list = document.getElementById('adminQueueList');
-                document.getElementById('adminQueueCount').textContent = d.items.length;
-                if (d.items.length === 0) {
-                    list.innerHTML = '<div class="empty">Queue is empty</div>';
-                    return;
-                }
-                list.innerHTML = d.items.map(item =>
-                    '<div class="history-item" data-id="' + item.id + '">'
-                    + '<div class="info">'
-                    + '<div class="title">' + escapeHtml(item.title || 'Loading...') + '</div>'
-                    + '<div class="sub"><span>' + escapeHtml(item.username) + '</span> <span>' + (item.created_at || '') + '</span></div>'
-                    + '</div>'
-                    + '<div style="display:flex;align-items:center;gap:3px;">'
-                    + '<a href="' + escapeHtml(item.clean_url || item.youtube_url || '') + '" target="_blank" class="view-btn" style="font-size:0.6rem;padding:3px 6px;">View</a>'
-                    + '<button class="del-btn" onclick="removeQueueItem(' + item.id + ',\'' + escapeHtml(item.title || '') + '\')" title="Remove from queue">&times;</button>'
-                    + '</div>'
-                    + '</div>'
-                ).join('');
-            }).catch(() => {});
-    }
-
-    // Auto-refresh queue list every 5s
-    setInterval(refreshQueueList, 5000);
 
     function deleteHistoryItem(id) {
         if (!confirm('Delete this history entry?')) return;

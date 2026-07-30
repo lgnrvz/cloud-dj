@@ -1029,27 +1029,6 @@ def remove_item(item_id):
     return jsonify({'success': True})
 
 
-@app.route('/admin/queue')
-@login_required
-def admin_queue():
-    """JSON endpoint for admin queue list (non-played items)."""
-    if not current_user.is_admin:
-        return jsonify({'error': 'Unauthorized'}), 403
-    conn = get_db()
-    rows = conn.execute(
-        "SELECT id, title, username, clean_url, youtube_url, created_at "
-        "FROM queue WHERE status != 'played' ORDER BY priority DESC, id ASC"
-    ).fetchall()
-    conn.close()
-    return jsonify({
-        'items': [{
-            'id': r['id'], 'title': r['title'], 'username': r['username'],
-            'clean_url': r['clean_url'], 'youtube_url': r['youtube_url'],
-            'created_at': r['created_at']
-        } for r in rows]
-    })
-
-
 @app.route('/admin/clear-history', methods=['POST'])
 @login_required
 def clear_history():
