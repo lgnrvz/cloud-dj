@@ -1,6 +1,17 @@
 # Cloud-DJ
 
-LAN music queue with YouTube playback, live chat, and admin controls.
+A self-hosted LAN music queue app. Anyone on the network can paste a YouTube link to add a song, see what's playing, vote with hearts, and chat in real-time. Designed for parties, videoke nights, and office jams.
+
+## Features
+
+- YouTube queue — paste a link, it plays. Supports `music.youtube.com` links too
+- Live chat — real-time Socket.IO chat with clickable link detection
+- Suggested songs — random picks from history, refreshes every 60s
+- Queue voting — heart your favorite songs
+- Videoke scoring — toggleable scoring with popup animations
+- Queue management — drag to reorder, remove, or skip (admin)
+- Admin panel — manage users, history, settings, and import/export songs
+- Search history — FTS5-powered search across played songs
 
 ## Install
 
@@ -15,35 +26,18 @@ python app.py
 
 ### Mac
 
-```bash
-git clone https://github.com/lgnrvz/cloud-dj.git
-cd cloud-dj
-pip install -r requirements.txt
-python app.py
-```
-
-If eventlet fails to install, use gevent instead:
+Same commands as Linux. If eventlet fails:
 
 ```bash
 pip uninstall eventlet -y
 pip install gevent gevent-websocket
 ```
 
-Then in `app.py` change line 56:
-```python
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
-```
+Then in `app.py` line 56, change `async_mode='eventlet'` to `async_mode='gevent'`.
 
 ### Windows
 
-```bash
-git clone https://github.com/lgnrvz/cloud-dj.git
-cd cloud-dj
-pip install -r requirements.txt
-python app.py
-```
-
-If eventlet fails, follow the same gevent fallback as Mac above.
+Same commands as Linux. Same eventlet fallback as Mac if needed.
 
 ## Login
 
@@ -54,19 +48,10 @@ Username: admin
 Password: djadmin123
 ```
 
-## Features
-
-- YouTube queue — paste a link, it plays
-- Live chat — real-time with clickable links
-- Suggested songs — random picks from history
-- Queue voting — heart songs you like
-- Videoke scoring — toggleable in admin panel
-- Admin controls — skip, remove, reorder, manage users
-
 ## Tech
 
-Flask, Socket.IO, SQLite, yt-dlp
+Flask, Socket.IO, SQLite (FTS5), yt-dlp.
 
 ---
 
-[GitHub](https://github.com/lgnrvz/cloud-dj)
+Support the dev: [Patreon](https://www.patreon.com/c/NRVZ)
