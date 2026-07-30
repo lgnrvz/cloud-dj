@@ -1291,23 +1291,20 @@
         btn.disabled = true;
         btn.textContent = '...';
         fetch('/replay/' + id, { method: 'POST' })
-            .then(r => r.json())
+            .then(r => {
+                if (r.status === 409) { showToast('Already in queue!', 'warn'); btn.disabled = false; btn.textContent = '+'; return; }
+                return r.json();
+            })
             .then(d => {
-                if (d.success) {
-                    btn.textContent = '&#10003;';
+                if (d && d.success) {
+                    showToast('Added: ' + d.title);
+                    btn.textContent = '\u2713';
                     btn.style.color = '#1db954';
                     setTimeout(() => { btn.disabled = false; btn.textContent = '+'; btn.style.color = ''; }, 2000);
                     refreshQueueList();
-                } else {
-                    btn.textContent = '!';
-                    btn.style.color = '#ff4444';
-                    setTimeout(() => { btn.disabled = false; btn.textContent = '+'; btn.style.color = ''; }, 2000);
                 }
             })
-            .catch(() => {
-                btn.disabled = false;
-                btn.textContent = '+';
-            });
+            .catch(() => { showToast('Failed', 'error'); btn.disabled = false; btn.textContent = '+'; });
     }
 
     // Initial load + refresh every 60s (only if card is visible)
