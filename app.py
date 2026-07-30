@@ -1372,7 +1372,7 @@ def handle_connect():
     # Send recent messages from DB
     conn = get_db()
     rows = conn.execute(
-        "SELECT username, message, is_admin, created_at FROM chat_messages ORDER BY id DESC LIMIT 50"
+        "SELECT username, message, is_admin, strftime('%H:%M', created_at) as time FROM chat_messages ORDER BY id DESC LIMIT 50"
     ).fetchall()
     conn.close()
     for row in reversed(rows):
@@ -1380,7 +1380,7 @@ def handle_connect():
             'username': row['username'],
             'message': row['message'],
             'is_admin': row['is_admin'],
-            'time': row['created_at'][-5:] if row['created_at'] else ''
+            'time': row['time'] or ''
         })
 
 
@@ -1397,13 +1397,13 @@ def handle_send_message(data):
         (current_user.username, msg, 1 if current_user.is_admin else 0)
     )
     conn.commit()
-    row = conn.execute("SELECT created_at FROM chat_messages WHERE id=last_insert_rowid()").fetchone()
+    row = conn.execute("SELECT strftime('%H:%M', created_at) as time FROM chat_messages WHERE id=last_insert_rowid()").fetchone()
     conn.close()
     entry = {
         'username': current_user.username,
         'message': msg,
         'is_admin': current_user.is_admin,
-        'time': row['created_at'][-5:] if row and row['created_at'] else ''
+        'time': row['time'] if row else ''
     }
     emit('chat_message', entry, room='chat')
     # Trim old messages (keep last 500)
