@@ -257,7 +257,7 @@ def init_db():
 init_db()
 
 def clean_yt_url(url):
-    match = re.search(r'(https?://(?:www\.|m\.)?(?:youtube\.com/watch\?v=|youtu\.be/))([\w-]+)', url)
+    match = re.search(r'(https?://(?:www\.|m\.|music\.)?(?:youtube\.com/watch\?v=|youtu\.be/))([\w-]+)', url)
     if match:
         return f'https://www.youtube.com/watch?v={match.group(2)}'
     return None
