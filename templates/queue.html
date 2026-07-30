@@ -456,7 +456,7 @@
                             <div class="title">{{ item.title or 'Loading...' }}</div>
                             <div class="sub">
                                 <span>{{ item.username }}</span>
-                                <span>{{ item.created_at }}</span>
+                                <span>{{ item.created_at[-5:] }}</span>
                                 {% if item.status == 'playing' %}<span class="badge badge-playing">Playing</span>{% endif %}
                             </div>
                         </div>
@@ -1373,15 +1373,30 @@
         const CHAT_ENABLED = true;
         const socket = io(window.location.origin, {
             transports: ['websocket', 'polling'],
-            autoConnect: true
+            autoConnect: true,
+            withCredentials: true,
+            reconnection: true,
+            reconnectionAttempts: 20,
+            reconnectionDelay: 1000
         });
         const chatEl = document.getElementById('chatMessages');
         const chatInput = document.getElementById('chatInput');
+        const chatSendBtn = document.getElementById('chatSendBtn');
         const chatCount = document.getElementById('chatCount');
         let msgCount = 0;
 
         socket.on('connect', function() {
             console.log('[chat] connected');
+            if (chatSendBtn) chatSendBtn.disabled = false;
+        });
+
+        socket.on('disconnect', function() {
+            console.log('[chat] disconnected');
+            if (chatSendBtn) chatSendBtn.disabled = true;
+        });
+
+        socket.on('connect_error', function(err) {
+            console.log('[chat] connect error:', err.message);
         });
 
         socket.on('chat_message', function(msg) {

@@ -49,7 +49,7 @@ def check_password_hash(pwhash, password):
         return False
 
 app = Flask(__name__)
-app.secret_key = os.urandom(24).hex()
+app.secret_key = 'cloud-dj-secret-key-change-in-production'
 app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=365)
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=365)
 
