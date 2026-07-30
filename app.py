@@ -186,7 +186,7 @@ def init_db():
         username TEXT NOT NULL,
         message TEXT NOT NULL,
         is_admin INTEGER DEFAULT 0,
-        created_at TEXT DEFAULT (datetime('now'))
+        created_at TEXT DEFAULT (datetime('now', 'localtime'))
     )""")
     # FTS5 index for history search — wrap in try/except to prevent DB corruption from crashing startup
     try:
@@ -1372,7 +1372,7 @@ def handle_connect():
     # Send recent messages from DB
     conn = get_db()
     rows = conn.execute(
-        "SELECT username, message, is_admin, strftime('%H:%M', created_at) as time FROM chat_messages ORDER BY id DESC LIMIT 50"
+        "SELECT username, message, is_admin, strftime('%H:%M', created_at, '+8 hours') as time FROM chat_messages ORDER BY id DESC LIMIT 50"
     ).fetchall()
     conn.close()
     for row in reversed(rows):
@@ -1397,7 +1397,7 @@ def handle_send_message(data):
         (current_user.username, msg, 1 if current_user.is_admin else 0)
     )
     conn.commit()
-    row = conn.execute("SELECT strftime('%H:%M', created_at) as time FROM chat_messages WHERE id=last_insert_rowid()").fetchone()
+    row = conn.execute("SELECT strftime('%H:%M', created_at, '+8 hours') as time FROM chat_messages WHERE id=last_insert_rowid()").fetchone()
     conn.close()
     entry = {
         'username': current_user.username,
