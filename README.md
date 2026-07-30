@@ -2,38 +2,70 @@
 
 LAN music queue with YouTube playback, live chat, and admin controls.
 
-## Quick Start
+## Install
+
+### Linux / Raspberry Pi
 
 ```bash
+git clone https://github.com/lgnrvz/cloud-dj.git
+cd cloud-dj
 pip install -r requirements.txt
 python app.py
 ```
 
-Open `http://localhost:5050`. Log in as `admin` / `djadmin123`.
+### Mac
 
-## Features
+```bash
+git clone https://github.com/lgnrvz/cloud-dj.git
+cd cloud-dj
+pip install -r requirements.txt
+python app.py
+```
 
-- YouTube queue — paste a link, it plays
-- Live chat — real-time, links auto-linkify
-- Suggested songs — random picks from history
-- Queue voting — heart songs you like
-- Videoke scoring — toggleable
-- Admin panel — skip, remove, reorder, manage users
-
-## Install
-
-Works on Linux, Mac, and Windows. If `eventlet` fails to install (Mac/Windows), swap it:
+If eventlet fails to install, use gevent instead:
 
 ```bash
 pip uninstall eventlet -y
 pip install gevent gevent-websocket
 ```
 
-Then change async mode in `app.py` to `'gevent'` or `'threading'`.
+Then in `app.py` change line 56:
+```python
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
+```
+
+### Windows
+
+```bash
+git clone https://github.com/lgnrvz/cloud-dj.git
+cd cloud-dj
+pip install -r requirements.txt
+python app.py
+```
+
+If eventlet fails, follow the same gevent fallback as Mac above.
+
+## Login
+
+Open `http://localhost:5050` and sign up, or use the admin account:
+
+```
+Username: admin
+Password: djadmin123
+```
+
+## Features
+
+- YouTube queue — paste a link, it plays
+- Live chat — real-time with clickable links
+- Suggested songs — random picks from history
+- Queue voting — heart songs you like
+- Videoke scoring — toggleable in admin panel
+- Admin controls — skip, remove, reorder, manage users
 
 ## Tech
 
-Flask, Socket.IO, SQLite, yt-dlp. Single-file backend.
+Flask, Socket.IO, SQLite, yt-dlp
 
 ---
 
