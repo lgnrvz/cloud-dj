@@ -35,9 +35,9 @@
 <!-- Forgot Password Card (hidden by default) -->
 <div class="auth-card card" id="forgotCard" style="display:none;">
     <h1>Reset Password</h1>
-    <p>Enter the default password and set a new one</p>
+    <p>Enter your username and set a new password</p>
     <form id="forgotForm" onsubmit="resetPassword(event)">
-        <input type="password" id="defaultPass" placeholder="Default password" required>
+        <input type="text" id="forgotUsername" placeholder="Username" required>
         <input type="password" id="newPass" placeholder="New password" required minlength="4">
         <input type="password" id="confirmPass" placeholder="Confirm new password" required minlength="4">
         <div id="forgotMsg" style="font-size:0.75rem;color:#ff4444;margin-bottom:8px;display:none;"></div>
@@ -61,11 +61,11 @@ function resetPassword(e) {
     e.preventDefault();
     const btn = e.target.querySelector('button');
     const msg = document.getElementById('forgotMsg');
-    const defaultPass = document.getElementById('defaultPass').value;
+    const username = document.getElementById('forgotUsername').value.trim();
     const newPass = document.getElementById('newPass').value;
     const confirmPass = document.getElementById('confirmPass').value;
 
-    if (!defaultPass || !newPass || !confirmPass) {
+    if (!username || !newPass || !confirmPass) {
         msg.textContent = 'All fields required';
         msg.style.display = '';
         return;
@@ -88,7 +88,7 @@ function resetPassword(e) {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
-            default_password: defaultPass,
+            username: username,
             new_password: newPass
         })
     }).then(r => r.json()).then(d => {

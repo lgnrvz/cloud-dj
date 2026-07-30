@@ -72,7 +72,7 @@ Go to `/admin` after logging in as admin.
 |---------|---------|-------------|
 | Scoring | Off | Videoke scoring popup |
 | Leaderboard | Off | Show leaderboard sidebar |
-| Suggested Songs | Off | Random song suggestions from history |
+| Suggested Songs | On | Random song suggestions from history |
 | Live Chat | On | Real-time chat for all users |
 
 ### Admin credentials

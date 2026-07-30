@@ -72,7 +72,7 @@ DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database.db')
 NOW_PLAYING = {'id': None, 'url': None, 'title': 'Nothing playing', 'username': '-', 'is_auto_dj': False, 'has_history': False}
 SCORING_ENABLED = False  # Videoke scoring toggle
 SHOW_LEADERBOARD = False  # Leaderboard visibility toggle
-SUGGESTED_ENABLED = False  # Suggested songs toggle
+SUGGESTED_ENABLED = True  # Suggested songs toggle
 CHAT_ENABLED = True  # Live chat toggle
 
 # Anti-abuse settings
@@ -424,21 +424,23 @@ def login():
 
 @app.route('/forgot-password', methods=['POST'])
 def forgot_password():
-    """Reset admin password using the default password."""
+    """Reset password using username as verification."""
     data = request.get_json()
     if not data:
         return jsonify({'error': 'No data'}), 400
-    default_password = data.get('default_password', '')
+    username = data.get('username', '').strip()
     new_password = data.get('new_password', '')
-    if not default_password or not new_password:
+    if not username or not new_password:
         return jsonify({'error': 'All fields required'}), 400
-    if default_password != 'djadmin123':
-        return jsonify({'error': 'Wrong default password'}), 403
     if len(new_password) < 4:
         return jsonify({'error': 'Min 4 characters'}), 400
     conn = get_db()
-    conn.execute("UPDATE users SET password=? WHERE is_admin=1",
-                 (generate_password_hash(new_password),))
+    user = conn.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone()
+    if not user:
+        conn.close()
+        return jsonify({'error': 'User not found'}), 404
+    conn.execute("UPDATE users SET password=? WHERE id=?",
+                 (generate_password_hash(new_password), user['id']))
     conn.commit()
     conn.close()
     return jsonify({'success': True})

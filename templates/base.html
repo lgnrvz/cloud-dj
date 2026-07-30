@@ -128,7 +128,22 @@
         {% endwith %}
         {% block content %}{% endblock %}
     </div>
+    <div class="footer">
+        Cloud-DJ <span class="sep">|</span> v1.0 <span class="sep">|</span> <a href="https://github.com/lgnrvz/cloud-dj" target="_blank" rel="noopener noreferrer">GitHub</a>
+    </div>
     <div class="toast" id="toast"></div>
+    <style>
+        .footer {
+            text-align: center;
+            padding: 12px 20px 20px;
+            font-size: 0.65rem;
+            color: #333;
+            border-top: 1px solid #111122;
+        }
+        .footer a { color: #555; text-decoration: none; transition: .2s; }
+        .footer a:hover { color: #1db954; }
+        .footer .sep { color: #2a2a3a; margin: 0 8px; }
+    </style>
     <script>
         const toast = document.getElementById('toast');
         function showToast(msg, type) {
