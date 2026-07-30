@@ -21,6 +21,35 @@ python app.py
 
 Open `http://localhost:5050` in your browser.
 
+### Mac (Apple Silicon / Intel)
+
+Same steps, but if `eventlet` fails to install (known issue on Mac), use gevent instead:
+
+```bash
+pip install -r requirements.txt
+pip uninstall eventlet -y
+pip install gevent gevent-websocket
+```
+
+Then in `app.py`, change async mode:
+```python
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
+```
+
+Or use threading mode (no extra deps, works everywhere):
+```python
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+```
+
+### Windows
+
+```bash
+pip install -r requirements.txt
+python app.py
+```
+
+> **Note:** On Windows, eventlet may also fail — use the same gevent fallback above.
+
 ## Install on a Server
 
 ```bash
