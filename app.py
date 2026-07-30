@@ -175,31 +175,57 @@ def init_db():
         username TEXT DEFAULT '-',
         created_at TEXT DEFAULT (datetime('now'))
     )""")
-    # FTS5 index for history search
-    conn.execute(
-        "CREATE VIRTUAL TABLE IF NOT EXISTS queue_fts USING fts5("
-        "title, username, clean_url, content='queue', content_rowid='id')"
-    )
-    # Triggers to keep FTS index in sync
-    for trig in [
-        "CREATE TRIGGER IF NOT EXISTS queue_ai AFTER INSERT ON queue BEGIN"
-        "  INSERT INTO queue_fts(rowid, title, username, clean_url)"
-        "  VALUES (new.id, new.title, new.username, new.clean_url); END",
-        "CREATE TRIGGER IF NOT EXISTS queue_ad AFTER DELETE ON queue BEGIN"
-        "  INSERT INTO queue_fts(queue_fts, rowid, title, username, clean_url)"
-        "  VALUES ('delete', old.id, old.title, old.username, old.clean_url); END",
-        "CREATE TRIGGER IF NOT EXISTS queue_au AFTER UPDATE ON queue BEGIN"
-        "  INSERT INTO queue_fts(queue_fts, rowid, title, username, clean_url)"
-        "  VALUES ('delete', old.id, old.title, old.username, old.clean_url);"
-        "  INSERT INTO queue_fts(rowid, title, username, clean_url)"
-        "  VALUES (new.id, new.title, new.username, new.clean_url); END",
-    ]:
-        conn.execute(trig)
-    # Repopulate FTS from existing played songs using safe rebuild
+    # FTS5 index for history search — wrap in try/except to prevent DB corruption from crashing startup
     try:
+        conn.execute(
+            "CREATE VIRTUAL TABLE IF NOT EXISTS queue_fts USING fts5("
+            "title, username, clean_url, content='queue', content_rowid='id')"
+        )
+        # Triggers to keep FTS index in sync
+        for trig in [
+            "CREATE TRIGGER IF NOT EXISTS queue_ai AFTER INSERT ON queue BEGIN"
+            "  INSERT INTO queue_fts(rowid, title, username, clean_url)"
+            "  VALUES (new.id, new.title, new.username, new.clean_url); END",
+            "CREATE TRIGGER IF NOT EXISTS queue_ad AFTER DELETE ON queue BEGIN"
+            "  INSERT INTO queue_fts(queue_fts, rowid, title, username, clean_url)"
+            "  VALUES ('delete', old.id, old.title, old.username, old.clean_url); END",
+            "CREATE TRIGGER IF NOT EXISTS queue_au AFTER UPDATE ON queue BEGIN"
+            "  INSERT INTO queue_fts(queue_fts, rowid, title, username, clean_url)"
+            "  VALUES ('delete', old.id, old.title, old.username, old.clean_url);"
+            "  INSERT INTO queue_fts(rowid, title, username, clean_url)"
+            "  VALUES (new.id, new.title, new.username, new.clean_url); END",
+        ]:
+            conn.execute(trig)
+        # Rebuild FTS index — safe command, not raw DELETE
         conn.execute("INSERT INTO queue_fts(queue_fts) VALUES('rebuild')")
-    except sqlite3.OperationalError:
-        pass  # No FTS table yet — will be populated by triggers
+    except sqlite3.DatabaseError:
+        # FTS table corrupt — drop and recreate
+        conn.execute("DROP TABLE IF EXISTS queue_fts")
+        conn.execute("DROP TABLE IF EXISTS queue_fts_data")
+        conn.execute("DROP TABLE IF EXISTS queue_fts_idx")
+        conn.execute("DROP TABLE IF EXISTS queue_fts_docsize")
+        conn.execute("DROP TABLE IF EXISTS queue_fts_config")
+        conn.execute(
+            "CREATE VIRTUAL TABLE queue_fts USING fts5("
+            "title, username, clean_url, content='queue', content_rowid='id')"
+        )
+        for trig in [
+            "CREATE TRIGGER IF NOT EXISTS queue_ai AFTER INSERT ON queue BEGIN"
+            "  INSERT INTO queue_fts(rowid, title, username, clean_url)"
+            "  VALUES (new.id, new.title, new.username, new.clean_url); END",
+            "CREATE TRIGGER IF NOT EXISTS queue_ad AFTER DELETE ON queue BEGIN"
+            "  INSERT INTO queue_fts(queue_fts, rowid, title, username, clean_url)"
+            "  VALUES ('delete', old.id, old.title, old.username, old.clean_url); END",
+            "CREATE TRIGGER IF NOT EXISTS queue_au AFTER UPDATE ON queue BEGIN"
+            "  INSERT INTO queue_fts(queue_fts, rowid, title, username, clean_url)"
+            "  VALUES ('delete', old.id, old.title, old.username, old.clean_url);"
+            "  INSERT INTO queue_fts(rowid, title, username, clean_url)"
+            "  VALUES (new.id, new.title, new.username, new.clean_url); END",
+        ]:
+            conn.execute(trig)
+        conn.execute("INSERT INTO queue_fts(queue_fts) VALUES('rebuild')")
+    except Exception:
+        pass  # Worst case — FTS disabled, app still runs
     admin = conn.execute("SELECT id FROM users WHERE username='admin'").fetchone()
     if not admin:
         conn.execute("INSERT INTO users (name, username, password, is_admin) VALUES (?, ?, ?, ?)",
