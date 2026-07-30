@@ -6,3 +6,6 @@ static/ph_clean_1000.txt
 static/ph_top_1000.txt
 .venv/
 venv/
+*.db-journal
+*.db-wal
+*.db-shm
