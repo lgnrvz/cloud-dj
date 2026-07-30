@@ -573,9 +573,8 @@
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
-                current: document.getElementById('currentPass').value,
-                new: document.getElementById('newPass').value,
-                confirm: document.getElementById('confirmPass').value
+                current_password: document.getElementById('currentPass').value,
+                new_password: document.getElementById('newPass').value
             })
         }).then(r => r.json()).then(d => {
             msg.style.display = 'inline';
