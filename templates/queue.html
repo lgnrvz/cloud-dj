@@ -39,7 +39,7 @@
             .navbar .brand { font-size: 0.95rem; }
             .navbar a { font-size: 0.7rem; margin-left: 10px; }
             .container { padding: 8px; gap: 8px; width: 100%; max-width: 100%; }
-            .main-col, .side-col { width: 100%; flex: none; }
+            .main-col, .mid-col, .side-col { width: 100%; flex: none; }
             .now-playing { padding: 10px 12px; gap: 10px; }
             .now-playing .track { font-size: 0.85rem; }
             .now-playing .meta { font-size: 0.65rem; }
@@ -435,13 +435,6 @@
                        style="width:100%;display:block;background:#000;"></video>
             </div>
             {% endif %}
-
-            <!-- Flash messages -->
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% for category, message in messages %}
-                    <div class="flash {{ category }}">{{ message }}</div>
-                {% endfor %}
-            {% endwith %}
 
             <!-- Queue -->
             <div class="card">
@@ -1369,30 +1362,28 @@
         return text.replace(urlPattern, '<a href="$1" target="_blank" rel="noopener noreferrer" style="color:#1db954;text-decoration:underline;">$1</a>');
     }
 
-    document.addEventListener('DOMContentLoaded', function() {
-        const CHAT_ENABLED = true;
-        const socket = io(window.location.origin, {
+    (function() {
+        var chatCard = document.getElementById('chatCard');
+        if (!chatCard) return;
+
+        var socket = io(window.location.origin, {
             transports: ['websocket', 'polling'],
-            autoConnect: true,
-            withCredentials: true,
             reconnection: true,
-            reconnectionAttempts: 20,
-            reconnectionDelay: 1000
+            reconnectionAttempts: Infinity,
+            reconnectionDelay: 1000,
+            reconnectionDelayMax: 5000
         });
-        const chatEl = document.getElementById('chatMessages');
-        const chatInput = document.getElementById('chatInput');
-        const chatSendBtn = document.getElementById('chatSendBtn');
-        const chatCount = document.getElementById('chatCount');
-        let msgCount = 0;
+        var chatEl = document.getElementById('chatMessages');
+        var chatInput = document.getElementById('chatInput');
+        var chatCount = document.getElementById('chatCount');
+        var msgCount = 0;
 
         socket.on('connect', function() {
             console.log('[chat] connected');
-            if (chatSendBtn) chatSendBtn.disabled = false;
         });
 
         socket.on('disconnect', function() {
             console.log('[chat] disconnected');
-            if (chatSendBtn) chatSendBtn.disabled = true;
         });
 
         socket.on('connect_error', function(err) {
@@ -1402,20 +1393,17 @@
         socket.on('chat_message', function(msg) {
             msgCount++;
             if (chatCount) chatCount.textContent = msgCount;
-            const div = document.createElement('div');
+            var div = document.createElement('div');
             div.style.cssText = 'display:flex;gap:4px;align-items:flex-start;line-height:1.3;';
-            // Time
-            const timeSpan = document.createElement('span');
+            var timeSpan = document.createElement('span');
             timeSpan.style.cssText = 'color:#444;font-size:0.6rem;flex-shrink:0;margin-top:1px;';
             timeSpan.textContent = msg.time || '';
             div.appendChild(timeSpan);
-            // Username
-            const nameSpan = document.createElement('span');
+            var nameSpan = document.createElement('span');
             nameSpan.style.cssText = 'font-weight:600;flex-shrink:0;color:' + (msg.is_admin ? '#1db954' : '#888') + ';';
             nameSpan.textContent = msg.username + ':';
             div.appendChild(nameSpan);
-            // Message with linkify
-            const msgSpan = document.createElement('span');
+            var msgSpan = document.createElement('span');
             msgSpan.style.cssText = 'word-break:break-word;color:#c8c8d0;';
             msgSpan.innerHTML = linkify(msg.message);
             div.appendChild(msgSpan);
@@ -1423,19 +1411,29 @@
             chatEl.scrollTop = chatEl.scrollHeight;
         });
 
-        function sendChatMsg() {
-            const text = chatInput.value.trim();
+        window.sendChatMsg = function() {
+            if (!chatInput) return;
+            var text = chatInput.value.trim();
             if (!text) return;
             socket.emit('send_message', { message: text });
             chatInput.value = '';
-        }
+            chatInput.focus();
+        };
 
         chatInput.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') sendChatMsg();
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                window.sendChatMsg();
+            }
         });
 
-        window.sendChatMsg = sendChatMsg;
-    });
+        // Keep connection alive every 25s
+        setInterval(function() {
+            if (socket.connected) {
+                socket.emit('ping');
+            }
+        }, 25000);
+    })();
     </script>
     {% endif %}
 </body>

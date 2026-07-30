@@ -49,7 +49,15 @@ def check_password_hash(pwhash, password):
         return False
 
 app = Flask(__name__)
-app.secret_key = 'cloud-dj-secret-key-change-in-production'
+# Persistent secret key — unique per install, survives restarts
+secret_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.secret_key')
+if os.path.isfile(secret_file):
+    with open(secret_file) as f:
+        app.secret_key = f.read().strip()
+else:
+    app.secret_key = secrets.token_hex(32)
+    with open(secret_file, 'w') as f:
+        f.write(app.secret_key)
 app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=365)
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=365)
 
@@ -1368,11 +1376,14 @@ def fetch_title(item_id, url):
 
 @socketio.on('connect')
 def handle_connect():
+    if not current_user.is_authenticated:
+        return False  # Reject connection
     join_room('chat')
     # Send recent messages from DB
     conn = get_db()
     rows = conn.execute(
-        "SELECT username, message, is_admin, strftime('%H:%M', created_at, '+8 hours') as time FROM chat_messages ORDER BY id DESC LIMIT 50"
+        "SELECT username, message, is_admin, strftime('%H:%M', created_at, '+8 hours') as time "
+        "FROM chat_messages ORDER BY id DESC LIMIT 50"
     ).fetchall()
     conn.close()
     for row in reversed(rows):
@@ -1391,26 +1402,35 @@ def handle_send_message(data):
     msg = data.get('message', '').strip()
     if not msg or len(msg) > 500:
         return
-    conn = get_db()
-    conn.execute(
-        "INSERT INTO chat_messages (username, message, is_admin) VALUES (?,?,?)",
-        (current_user.username, msg, 1 if current_user.is_admin else 0)
-    )
-    conn.commit()
-    row = conn.execute("SELECT strftime('%H:%M', created_at, '+8 hours') as time FROM chat_messages WHERE id=last_insert_rowid()").fetchone()
-    conn.close()
-    entry = {
-        'username': current_user.username,
-        'message': msg,
-        'is_admin': current_user.is_admin,
-        'time': row['time'] if row else ''
-    }
-    emit('chat_message', entry, room='chat')
-    # Trim old messages (keep last 500)
-    conn = get_db()
-    conn.execute("DELETE FROM chat_messages WHERE id NOT IN (SELECT id FROM chat_messages ORDER BY id DESC LIMIT 500)")
-    conn.commit()
-    conn.close()
+    try:
+        conn = get_db()
+        conn.execute(
+            "INSERT INTO chat_messages (username, message, is_admin) VALUES (?,?,?)",
+            (current_user.username, msg, 1 if current_user.is_admin else 0)
+        )
+        conn.commit()
+        row = conn.execute(
+            "SELECT strftime('%H:%M', created_at, '+8 hours') as time "
+            "FROM chat_messages WHERE id=last_insert_rowid()"
+        ).fetchone()
+        conn.close()
+        entry = {
+            'username': current_user.username,
+            'message': msg,
+            'is_admin': current_user.is_admin,
+            'time': row['time'] if row else ''
+        }
+        emit('chat_message', entry, room='chat', broadcast=True)
+        # Trim old messages (keep last 500)
+        conn = get_db()
+        conn.execute(
+            "DELETE FROM chat_messages WHERE id NOT IN "
+            "(SELECT id FROM chat_messages ORDER BY id DESC LIMIT 500)"
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
 
 
 if __name__ == '__main__':
