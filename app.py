@@ -66,7 +66,6 @@ SCORING_ENABLED = False  # Videoke scoring toggle
 SHOW_LEADERBOARD = False  # Leaderboard visibility toggle
 SUGGESTED_ENABLED = False  # Suggested songs toggle
 CHAT_ENABLED = True  # Live chat toggle
-CHAT_MESSAGES = []  # In-memory chat history (max 100)
 
 # Anti-abuse settings
 MAX_CONSECUTIVE_QUEUE = 16  # Max songs a user can add consecutively (1-16)
@@ -180,6 +179,13 @@ def init_db():
         score INTEGER NOT NULL,
         title TEXT DEFAULT 'Unknown',
         username TEXT DEFAULT '-',
+        created_at TEXT DEFAULT (datetime('now'))
+    )""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS chat_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT NOT NULL,
+        message TEXT NOT NULL,
+        is_admin INTEGER DEFAULT 0,
         created_at TEXT DEFAULT (datetime('now'))
     )""")
     # FTS5 index for history search — wrap in try/except to prevent DB corruption from crashing startup
@@ -1363,9 +1369,19 @@ def fetch_title(item_id, url):
 @socketio.on('connect')
 def handle_connect():
     join_room('chat')
-    # Send recent messages to the newly connected client
-    for msg in CHAT_MESSAGES[-50:]:
-        emit('chat_message', msg)
+    # Send recent messages from DB
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT username, message, is_admin, created_at FROM chat_messages ORDER BY id DESC LIMIT 50"
+    ).fetchall()
+    conn.close()
+    for row in reversed(rows):
+        emit('chat_message', {
+            'username': row['username'],
+            'message': row['message'],
+            'is_admin': row['is_admin'],
+            'time': row['created_at'][-5:] if row['created_at'] else ''
+        })
 
 
 @socketio.on('send_message')
@@ -1375,17 +1391,26 @@ def handle_send_message(data):
     msg = data.get('message', '').strip()
     if not msg or len(msg) > 500:
         return
+    conn = get_db()
+    conn.execute(
+        "INSERT INTO chat_messages (username, message, is_admin) VALUES (?,?,?)",
+        (current_user.username, msg, 1 if current_user.is_admin else 0)
+    )
+    conn.commit()
+    row = conn.execute("SELECT created_at FROM chat_messages WHERE id=last_insert_rowid()").fetchone()
+    conn.close()
     entry = {
         'username': current_user.username,
         'message': msg,
         'is_admin': current_user.is_admin,
-        'time': datetime.now().strftime('%H:%M')
+        'time': row['created_at'][-5:] if row and row['created_at'] else ''
     }
-    CHAT_MESSAGES.append(entry)
-    # Keep only last 100
-    while len(CHAT_MESSAGES) > 100:
-        CHAT_MESSAGES.pop(0)
     emit('chat_message', entry, room='chat')
+    # Trim old messages (keep last 500)
+    conn = get_db()
+    conn.execute("DELETE FROM chat_messages WHERE id NOT IN (SELECT id FROM chat_messages ORDER BY id DESC LIMIT 500)")
+    conn.commit()
+    conn.close()
 
 
 if __name__ == '__main__':
