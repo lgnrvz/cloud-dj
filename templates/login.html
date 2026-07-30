@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Sign in &middot; Cloud-DJ{% endblock %}
 {% block content %}
-<div class="auth-card card">
+<div class="auth-card card" id="loginCard">
     <h1>Welcome</h1>
     <p>Sign in to request songs and control the queue</p>
     <form method="POST">
@@ -25,6 +25,90 @@
         }
     }
     </script>
-    <div class="auth-link">No account? <a href="{{ url_for('signup') }}">Sign up here</a></div>
+    <div class="auth-link">
+        <a href="#" onclick="showForgotPassword(); return false;">Forgot password?</a>
+        &middot;
+        <a href="{{ url_for('signup') }}">Sign up here</a>
+    </div>
 </div>
+
+<!-- Forgot Password Card (hidden by default) -->
+<div class="auth-card card" id="forgotCard" style="display:none;">
+    <h1>Reset Password</h1>
+    <p>Enter the default password and set a new one</p>
+    <form id="forgotForm" onsubmit="resetPassword(event)">
+        <input type="password" id="defaultPass" placeholder="Default password (djadmin123)" required>
+        <input type="password" id="newPass" placeholder="New password" required minlength="4">
+        <input type="password" id="confirmPass" placeholder="Confirm new password" required minlength="4">
+        <div id="forgotMsg" style="font-size:0.75rem;color:#ff4444;margin-bottom:8px;display:none;"></div>
+        <button type="submit">Reset Password</button>
+    </form>
+    <div class="auth-link"><a href="#" onclick="showLogin(); return false;">Back to login</a></div>
+</div>
+
+<script>
+function showForgotPassword() {
+    document.getElementById('loginCard').style.display = 'none';
+    document.getElementById('forgotCard').style.display = '';
+}
+function showLogin() {
+    document.getElementById('forgotCard').style.display = 'none';
+    document.getElementById('loginCard').style.display = '';
+    document.getElementById('forgotMsg').style.display = 'none';
+}
+
+function resetPassword(e) {
+    e.preventDefault();
+    const btn = e.target.querySelector('button');
+    const msg = document.getElementById('forgotMsg');
+    const defaultPass = document.getElementById('defaultPass').value;
+    const newPass = document.getElementById('newPass').value;
+    const confirmPass = document.getElementById('confirmPass').value;
+
+    if (!defaultPass || !newPass || !confirmPass) {
+        msg.textContent = 'All fields required';
+        msg.style.display = '';
+        return;
+    }
+    if (newPass !== confirmPass) {
+        msg.textContent = 'New passwords do not match';
+        msg.style.display = '';
+        return;
+    }
+    if (newPass.length < 4) {
+        msg.textContent = 'Min 4 characters';
+        msg.style.display = '';
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = '...';
+
+    fetch('/forgot-password', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            default_password: defaultPass,
+            new_password: newPass
+        })
+    }).then(r => r.json()).then(d => {
+        msg.style.display = '';
+        if (d.success) {
+            msg.style.color = '#1db954';
+            msg.textContent = 'Password reset! Redirecting...';
+            setTimeout(() => window.location.href = '/queue', 1500);
+        } else {
+            msg.style.color = '#ff4444';
+            msg.textContent = d.error || 'Reset failed';
+        }
+    }).catch(() => {
+        msg.style.display = '';
+        msg.style.color = '#ff4444';
+        msg.textContent = 'Server error';
+    }).finally(() => {
+        btn.disabled = false;
+        btn.textContent = 'Reset Password';
+    });
+}
+</script>
 {% endblock %}

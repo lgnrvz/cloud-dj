@@ -400,6 +400,29 @@ def login():
         flash('Invalid credentials!', 'danger')
     return render_template('login.html')
 
+
+@app.route('/forgot-password', methods=['POST'])
+def forgot_password():
+    """Reset admin password using the default password."""
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data'}), 400
+    default_password = data.get('default_password', '')
+    new_password = data.get('new_password', '')
+    if not default_password or not new_password:
+        return jsonify({'error': 'All fields required'}), 400
+    if default_password != 'djadmin123':
+        return jsonify({'error': 'Wrong default password'}), 403
+    if len(new_password) < 4:
+        return jsonify({'error': 'Min 4 characters'}), 400
+    conn = get_db()
+    conn.execute("UPDATE users SET password=? WHERE is_admin=1",
+                 (generate_password_hash(new_password),))
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True})
+
+
 @app.route('/logout')
 @login_required
 def logout():
