@@ -1793,5 +1793,37 @@ def handle_react_message(data):
 
 
 if __name__ == '__main__':
+    import socket as _net_socket
     _port = int(os.environ.get('PORT', 5050))
-    socketio.run(app, host='0.0.0.0', port=_port, debug=False, use_reloader=False, allow_unsafe_werkzeug=True)
+    _port_range = 10  # try up to 10 ports when the base one is taken/blocked
+
+    # Pre-check port availability. Windows throws WSAEACCES (10013) when the
+    # port is in use or inside a reserved range, so fall forward to a free one.
+    _chosen = None
+    for _p in range(_port, _port + _port_range):
+        _probe = _net_socket.socket(_net_socket.AF_INET, _net_socket.SOCK_STREAM)
+        try:
+            _probe.bind(('0.0.0.0', _p))
+            _chosen = _p
+            break
+        except OSError:
+            continue
+        finally:
+            _probe.close()
+    if _chosen is None:
+        _chosen = _port
+        print(f'[cloud-dj] WARNING: ports {_port}-{_port + _port_range - 1} all busy, trying {_port} anyway')
+    elif _chosen != _port:
+        print(f'[cloud-dj] Port {_port} is busy/blocked - using port {_chosen} instead')
+
+    # Print LAN + local URLs so users know where to connect
+    try:
+        _s = _net_socket.socket(_net_socket.AF_INET, _net_socket.SOCK_DGRAM)
+        _s.connect(('8.8.8.8', 80))
+        _lan_ip = _s.getsockname()[0]
+        _s.close()
+    except Exception:
+        _lan_ip = '127.0.0.1'
+    print(f'[cloud-dj] LAN access: http://{_lan_ip}:{_chosen}  |  Local: http://localhost:{_chosen}')
+
+    socketio.run(app, host='0.0.0.0', port=_chosen, debug=False, use_reloader=False, allow_unsafe_werkzeug=True)
