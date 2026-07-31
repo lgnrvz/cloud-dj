@@ -1,4 +1,4 @@
-#!/usr/bin/env pwsh
+﻿#!/usr/bin/env pwsh
 <#
 .SYNOPSIS
     Cloud-DJ — Desktop Installer for Windows
@@ -201,10 +201,10 @@ function Install-Direct {
 # ── Banner ──────────────────────────────────────────────────
 Clear-Host
 Write-Host @"
-   ╔═══════════════════════════════╗
-   ║  CLOUD-DJ                     ║
-   ╚═══════════════════════════════╝
-Cloud-DJ LAN Music Server Installer — Windows Edition
+============================================================
+  CLOUD-DJ
+============================================================
+Cloud-DJ LAN Music Server Installer - Windows Edition
 "@ -ForegroundColor Cyan
 
 # ── Step 1: Check Windows version ───────────────────────────
@@ -418,6 +418,8 @@ if (-not (Test-Path $pipExe)) {
 
 Write-Info "Installing Python dependencies..."
 & $pipExe install --upgrade pip --quiet 2>&1 | Out-Null
+# Drop eventlet if an older install left it behind (threading mode doesn't need it)
+& $pipExe uninstall eventlet -y --quiet 2>&1 | Out-Null
 & $pipExe install -r requirements.txt --quiet 2>&1 | Out-Null
 if ($LASTEXITCODE -ne 0) {
     Write-Warn "pip install had issues — showing output:"
@@ -578,6 +580,6 @@ Write-Host @"
   Change port:
     `$env:PORT=9090; powershell -File install.ps1
 
-Happy spinning! 🎧
+Happy spinning! [music notes]
 
 "@ -ForegroundColor Cyan

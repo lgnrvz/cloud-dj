@@ -220,6 +220,14 @@ if not NODE_PATH:
 venv_dir = os.path.dirname(sys.executable)  # e.g., .venv/Scripts/ or .venv/bin/
 YTDLP = None
 
+# 0. PyInstaller bundle: bundled binaries are extracted to sys._MEIPASS
+if getattr(sys, 'frozen', False):
+    for exe in ['yt-dlp.exe', 'yt-dlp']:
+        candidate = os.path.join(sys._MEIPASS, exe)
+        if os.path.isfile(candidate):
+            YTDLP = candidate
+            break
+
 # 1. Check venv Scripts/bin directory first (most reliable)
 for exe in ['yt-dlp', 'yt-dlp.exe']:
     candidate = os.path.join(venv_dir, exe)
@@ -1785,4 +1793,5 @@ def handle_react_message(data):
 
 
 if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', port=5050, debug=False, use_reloader=False, allow_unsafe_werkzeug=True)
+    _port = int(os.environ.get('PORT', 5050))
+    socketio.run(app, host='0.0.0.0', port=_port, debug=False, use_reloader=False, allow_unsafe_werkzeug=True)

@@ -1,0 +1,71 @@
+name: Build Windows exe
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller yt-dlp
+
+      - name: Download ffmpeg (essentials build)
+        run: |
+          Invoke-WebRequest -Uri "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" -OutFile ffmpeg.zip
+          Expand-Archive ffmpeg.zip -DestinationPath ffmpeg
+          $ff = Get-ChildItem ffmpeg -Directory | Select-Object -First 1
+          Copy-Item "$($ff.FullName)\bin\ffmpeg.exe" .
+          Copy-Item "$($ff.FullName)\bin\ffprobe.exe" .
+
+      - name: Build single-file exe with PyInstaller
+        run: |
+          $yt = (Get-Command yt-dlp).Source
+          pyinstaller --onefile --name cloud-dj --console `
+            --add-binary "$yt;." `
+            --add-binary "ffmpeg.exe;." `
+            --add-binary "ffprobe.exe;." `
+            --add-data "templates;templates" `
+            --add-data "static;static" `
+            --hidden-import "engineio.async_drivers.threading" `
+            --hidden-import "simple_websocket" `
+            app.py
+
+      - name: Smoke test (boot exe, hit HTTP)
+        run: |
+          $p = Start-Process -FilePath "dist\cloud-dj.exe" -PassThru
+          Start-Sleep -Seconds 15
+          try {
+            $r = Invoke-WebRequest -Uri "http://localhost:5050" -TimeoutSec 8 -UseBasicParsing
+            Write-Host "SMOKE OK: HTTP $($r.StatusCode)"
+            if ($r.StatusCode -ne 200 -and $r.StatusCode -ne 302) { exit 1 }
+          } catch {
+            Write-Host "SMOKE FAIL: $_"
+            exit 1
+          } finally {
+            Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Upload exe as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloud-dj-windows
+          path: dist/cloud-dj.exe
+          retention-days: 30
+
+      - name: Attach exe to release (only on version tags)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/cloud-dj.exe
+          generate_release_notes: true

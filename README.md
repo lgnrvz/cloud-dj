@@ -26,18 +26,28 @@ python app.py
 
 ### Mac
 
-Same commands as Linux. If eventlet fails:
+Same commands as Linux. No extra setup — the app uses the built-in threading
+async mode, so eventlet/gevent are not needed.
 
-```bash
-pip uninstall eventlet -y
-pip install gevent gevent-websocket
+### Windows (recommended: one-file .exe)
+
+Download `cloud-dj.exe` from the [Releases](https://github.com/lgnrvz/cloud-dj/releases)
+page, double-click it, and open `http://localhost:5050`. The exe bundles
+Python, all dependencies, yt-dlp, and ffmpeg — no install needed.
+
+Change the port with: `PORT=9090 cloud-dj.exe` (or set the `PORT` env var).
+
+### Windows (installer script)
+
+Run the full automated installer (installs Python, Git, ffmpeg, firewall rule,
+auto-start):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File install.ps1
 ```
 
-Then in `app.py` line 56, change `async_mode='eventlet'` to `async_mode='gevent'`.
-
-### Windows
-
-Same commands as Linux. Same eventlet fallback as Mac if needed.
+Or manually, same commands as Linux. The app auto-selects a compatible async
+mode on Windows, so no config edits are needed.
 
 ## Login
 
