@@ -532,13 +532,13 @@
             {% endif %}
 
             {% if not current_user.is_admin %}
-            <!-- Now Playing (shown to normal users when Auto-DJ is playing) -->
-            <div class="now-playing" id="userNowBar" style="display:none;">
+            <!-- Now Playing (normal users) -->
+            <div class="now-playing" id="userNowBar">
                 <span class="indicator"></span>
                 <div class="np-content">
                     <div class="label">Now Playing</div>
-                    <div class="track" id="userNowTrack"></div>
-                    <div class="meta" id="userNowMeta">Auto-DJ</div>
+                    <div class="track" id="userNowTrack">Nothing playing</div>
+                    <div class="meta" id="userNowMeta">-</div>
                 </div>
             </div>
             {% endif %}
@@ -1111,15 +1111,13 @@
             if (nm) nm.textContent = np.username || '-';
             const qc = document.getElementById('queueCount');
             if (qc) qc.textContent = (np.queue_count || 0) + ' in queue';
-            // Normal users: show Now Playing bar only while Auto-DJ is playing
+            // Normal users: always-updating Now Playing bar
             const ub = document.getElementById('userNowBar');
             if (ub) {
-                const isAutoDj = np.is_auto_dj && np.title && np.title !== 'Nothing playing';
-                ub.style.display = isAutoDj ? 'flex' : 'none';
-                if (isAutoDj) {
-                    const ut = document.getElementById('userNowTrack');
-                    if (ut) ut.textContent = np.title;
-                }
+                const ut = document.getElementById('userNowTrack');
+                const um = document.getElementById('userNowMeta');
+                if (ut) ut.textContent = np.title || 'Nothing playing';
+                if (um) um.textContent = np.username || '-';
             }
             if (lastQueueCount !== -1 && lastQueueCount !== np.queue_count) {
                 if (typeof refreshQueueList === 'function') refreshQueueList();
