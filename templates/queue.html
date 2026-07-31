@@ -478,10 +478,10 @@
                     <button onclick="sendReaction('😡')" title="Angry">😡</button>
                     <button onclick="sendReaction('🎵')" title="Song Notes">🎵</button>
                 </div>
-                <div style="display:flex;gap:4px;padding:8px 12px;border-top:1px solid #1a1a2e;">
-                    <button id="emojiBtn" onclick="toggleEmojiPicker()" title="Emojis" style="padding:4px 8px;border-radius:4px;border:1px solid #2a2a3a;background:#1a1a2a;cursor:pointer;font-size:0.85rem;line-height:1.4;">🙂</button>
-                    <input type="text" id="chatInput" placeholder="Type a message..." style="flex:1;padding:6px 8px;border-radius:4px;border:1px solid #2a2a3a;background:#1a1a2a;color:#e0e0e8;font-family:Inter,sans-serif;font-size:0.75rem;outline:none;">
-                    <button id="chatSendBtn" onclick="sendChatMsg()" style="padding:6px 10px;border-radius:4px;border:none;background:#1db954;color:#000;font-weight:600;cursor:pointer;font-size:0.7rem;font-family:Inter,sans-serif;">Send</button>
+                <div style="display:flex;gap:4px;padding:8px 12px;border-top:1px solid #1a1a2e;min-width:0;">
+                    <button id="emojiBtn" onclick="toggleEmojiPicker()" title="Emojis" style="padding:4px 8px;border-radius:4px;border:1px solid #2a2a3a;background:#1a1a2a;cursor:pointer;font-size:0.85rem;line-height:1.4;flex-shrink:0;">🙂</button>
+                    <input type="text" id="chatInput" placeholder="Type a message..." style="flex:1;min-width:0;padding:6px 8px;border-radius:4px;border:1px solid #2a2a3a;background:#1a1a2a;color:#e0e0e8;font-family:Inter,sans-serif;font-size:0.75rem;outline:none;">
+                    <button id="chatSendBtn" onclick="sendChatMsg()" style="padding:6px 10px;border-radius:4px;border:none;background:#1db954;color:#000;font-weight:600;cursor:pointer;font-size:0.7rem;font-family:Inter,sans-serif;flex-shrink:0;">Send</button>
                 </div>
             </div>
             {% endif %}
