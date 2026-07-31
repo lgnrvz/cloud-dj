@@ -400,11 +400,12 @@
                 userCache = d.items;
                 list.innerHTML = d.items.map((u, idx) =>
                     '<div class="user-item">'
-                    + '<span class="name">' + escapeHtml(u.name) + '</span>'
+                    + '<div class="name" style="display:flex;align-items:center;gap:6px;">' + escapeHtml(u.name)
+                    + '<span style="color:#666;font-weight:400;">@' + escapeHtml(u.username) + '</span>'
                     + (u.is_admin ? '<span class="badge-admin">Admin</span>' : '')
                     + (u.banned ? '<span class="badge-admin" style="background:#ff444422;color:#ff4444;border-color:#ff444444;">Banned</span>' : '')
-                    + '<div class="joined">@' + escapeHtml(u.username) + ' &middot; ' + (u.created_at || '').substring(0,10) + '</div>'
-                    + '<div class="joined" style="font-size:0.6rem;color:#444;">' + escapeHtml(u.ip_address || 'no IP') + '</div>'
+                    + '</div>'
+                    + '<div class="joined" style="font-size:0.65rem;color:#555;">' + escapeHtml(u.ip_address || 'no IP') + '</div>'
                     + (u.is_admin ? '' : '<button class="del-btn" style="font-size:0.75rem;color:#888;" onclick="openUserModal(' + idx + ')" title="User actions">&#9881;</button>')
                     + (u.is_admin ? '' : '<button class="del-btn" onclick="deleteUser(' + u.id + ',\'' + escapeHtml(u.username) + '\')" title="Delete user">&#x2715;</button>')
                     + '</div>'
@@ -421,6 +422,7 @@
         document.getElementById('umName').dataset.idx = idx;
         document.getElementById('umUsername').textContent = '@' + u.username;
         document.getElementById('umIp').textContent = 'IP: ' + (u.ip_address || 'no IP');
+        document.getElementById('umJoined').textContent = 'Joined: ' + (u.created_at || '').substring(0, 16);
         const st = document.getElementById('umBanStatus');
         if (u.banned) {
             st.textContent = u.banned_until === 'permanent' ? 'Banned permanently' : 'Banned until ' + u.banned_until;
@@ -626,7 +628,8 @@
         <div style="background:#0d0d16;border:1px solid #2a2a3a;border-radius:10px;max-width:340px;width:90%;padding:20px;">
             <h3 id="umName" style="color:#fff;font-size:1rem;margin-bottom:2px;"></h3>
             <div id="umUsername" style="color:#888;font-size:0.75rem;margin-bottom:8px;"></div>
-            <div id="umIp" style="color:#555;font-size:0.7rem;margin-bottom:8px;"></div>
+            <div id="umIp" style="color:#555;font-size:0.7rem;margin-bottom:4px;"></div>
+            <div id="umJoined" style="color:#555;font-size:0.7rem;margin-bottom:8px;"></div>
             <div id="umBanStatus" style="font-size:0.75rem;margin-bottom:14px;"></div>
             <div style="font-size:0.7rem;color:#666;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;">Ban duration</div>
             <select id="umDuration" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid #2a2a3a;background:#1a1a2a;color:#e0e0e8;font-family:inherit;font-size:0.8rem;margin-bottom:14px;">

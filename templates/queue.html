@@ -423,7 +423,7 @@
         <div class="brand">Cloud<span>DJ</span></div>
         <div>
             <span style="color:#555;font-size:0.8rem;">{{ current_user.name }}</span>
-            {% if current_user.is_admin %}<a href="/admin">Admin</a>{% endif %}
+            {% if current_user.is_admin %}<a href="/admin" target="_blank" rel="noopener noreferrer">Admin</a>{% endif %}
             <a href="/logout">Sign out</a>
         </div>
     </nav>
