@@ -1185,13 +1185,20 @@ def admin_history():
 
     conn = get_db()
     total = conn.execute("SELECT COUNT(*) as c FROM queue WHERE status='played'").fetchone()['c']
-    rows = conn.execute("""
+    # Sort whitelist: name | played (request count) | date (default, newest first)
+    sort = request.args.get('sort', 'date')
+    order_by = {
+        'name': 'q.title COLLATE NOCASE ASC',
+        'played': 'request_count DESC',
+        'date': 'q.id DESC',
+    }.get(sort, 'q.id DESC')
+    rows = conn.execute(f"""
         SELECT q.*,
             (SELECT COUNT(*) FROM queue WHERE clean_url = q.clean_url) as request_count,
             strftime('%Y-%m-%d %H:%M', q.created_at, '+8 hours') as created_at_ph
         FROM queue q
         WHERE q.status='played'
-        ORDER BY q.id DESC LIMIT ? OFFSET ?
+        ORDER BY {order_by} LIMIT ? OFFSET ?
     """, (per_page, offset)).fetchall()
     conn.close()
 

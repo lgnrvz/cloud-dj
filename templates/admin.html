@@ -177,6 +177,14 @@
             font-weight: 600;
         }
 
+        .sort-pill {
+            background: none; border: 1px solid #2a2a3a; color: #777;
+            font-size: 0.62rem; padding: 2px 10px; border-radius: 10px;
+            cursor: pointer; font-family: inherit; transition: .15s;
+        }
+        .sort-pill:hover { color: #1db954; border-color: #1db95444; }
+        .sort-pill.active { color: #1db954; border-color: #1db954; background: #1db95411; }
+
         .srv-info { font-size: 0.78rem; line-height: 1.7; padding: 10px 14px; }
         .srv-info strong { color: #888; }
         .empty { text-align: center; padding: 32px; color: #444; font-size: 0.85rem; }
@@ -222,6 +230,12 @@
                         <span style="color:#444;font-size:0.7rem;" id="histTotal">0 played</span>
                         <button class="clr-btn" onclick="clearHistory()" style="padding:4px 10px;">Clear All</button>
                     </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;padding:8px 18px;border-bottom:1px solid #1a1a2e;">
+                    <span style="color:#555;font-size:0.65rem;margin-right:2px;">Sort</span>
+                    <button class="sort-pill active" id="sortDate" onclick="setHistorySort('date')">Date</button>
+                    <button class="sort-pill" id="sortName" onclick="setHistorySort('name')">Name</button>
+                    <button class="sort-pill" id="sortPlayed" onclick="setHistorySort('played')">Played</button>
                 </div>
                 <div id="histList">
                     <div class="empty">Loading...</div>
@@ -343,9 +357,10 @@
     }, 5000);
 
     // Load paginated history
+    let curHistorySort = 'date';
     function loadHistory(page) {
         curPage = page;
-        fetch('/admin/history?page=' + page + '&per_page=15')
+        fetch('/admin/history?page=' + page + '&per_page=15&sort=' + curHistorySort)
             .then(r => r.json())
             .then(d => {
                 document.getElementById('histTotal').textContent = d.total + ' played';
@@ -374,6 +389,15 @@
                     + '</div>'
                 ).join('');
             }).catch(() => {});
+    }
+
+    function setHistorySort(sort) {
+        curHistorySort = sort;
+        document.querySelectorAll('.sort-pill').forEach(b => b.classList.remove('active'));
+        const idMap = {date: 'sortDate', name: 'sortName', played: 'sortPlayed'};
+        const pill = document.getElementById(idMap[sort]);
+        if (pill) pill.classList.add('active');
+        loadHistory(1);
     }
 
     function escapeHtml(t) {
