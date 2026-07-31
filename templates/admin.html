@@ -271,7 +271,7 @@
             <div class="card">
                 <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid #1a1a2e;">
                     <h2 style="padding:0;border-bottom:none;">Server</h2>
-                    <span id="srvCountdown" style="color:#444;font-size:0.65rem;">5s</span>
+                    <span id="srvCountdown" style="color:#444;font-size:0.65rem;">10s</span>
                 </div>
                 <div class="srv-info" style="padding:10px 14px;font-size:0.78rem;line-height:1.9;">
                     <strong style="color:#888;">IP:</strong> <span id="srvIp">Loading...</span><br>
@@ -362,11 +362,11 @@
     }, 5000);
 
     // Live system stats for the Server card
-    let srvTimer = 5;
+    let srvTimer = 10;
     const srvCount = document.getElementById('srvCountdown');
     function loadSystem() {
-        srvTimer = 5;
-        if (srvCount) srvCount.textContent = '5s';
+        srvTimer = 10;
+        if (srvCount) srvCount.textContent = '10s';
         fetch('/admin/system').then(r => r.json()).then(d => {
             document.getElementById('srvIp').textContent = d.ip + ':' + location.port;
             document.getElementById('srvCpu').textContent = d.cpu === null || d.cpu === undefined ? '—' : d.cpu + '%';
@@ -377,10 +377,10 @@
         }).catch(() => {});
     }
     loadSystem();
-    setInterval(loadSystem, 5000);
+    setInterval(loadSystem, 10000);
     setInterval(function() {
         srvTimer--;
-        if (srvTimer <= 0) srvTimer = 5;
+        if (srvTimer <= 0) srvTimer = 10;
         if (srvCount) srvCount.textContent = srvTimer + 's';
     }, 1000);
 
