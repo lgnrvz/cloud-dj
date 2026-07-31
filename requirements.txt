@@ -1,6 +1,6 @@
 flask>=3.0
 flask-login>=0.6
 flask-socketio>=5.0
-eventlet>=0.33
+simple-websocket>=0.10
 werkzeug>=3.0
 yt-dlp>=2024.0
