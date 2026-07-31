@@ -401,6 +401,7 @@
                     + '<span class="name">' + escapeHtml(u.name) + '</span>'
                     + (u.is_admin ? '<span class="badge-admin">Admin</span>' : '')
                     + '<div class="joined">@' + escapeHtml(u.username) + ' &middot; ' + (u.created_at || '').substring(0,10) + '</div>'
+                    + '<div class="joined" style="font-size:0.6rem;color:#444;">' + escapeHtml(u.ip_address || 'no IP') + '</div>'
                     + (u.is_admin ? '' : '<button class="del-btn" onclick="deleteUser(' + u.id + ',\'' + escapeHtml(u.username) + '\')" title="Delete user">&#x2715;</button>')
                     + '</div>'
                 ).join('');

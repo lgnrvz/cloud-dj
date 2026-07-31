@@ -150,6 +150,7 @@ def init_db():
         username TEXT UNIQUE NOT NULL,
         password TEXT NOT NULL,
         is_admin INTEGER DEFAULT 0,
+        ip_address TEXT DEFAULT '',
         created_at TEXT DEFAULT (datetime('now'))
     )''')
     conn.execute('''CREATE TABLE IF NOT EXISTS queue (
@@ -181,6 +182,11 @@ def init_db():
             conn.execute(f"ALTER TABLE queue ADD COLUMN {col_sql}")
         except sqlite3.OperationalError:
             pass
+    # Safe migration: add ip_address to users if missing (existing DBs)
+    try:
+        conn.execute("ALTER TABLE users ADD COLUMN ip_address TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
     conn.execute("""CREATE TABLE IF NOT EXISTS scores (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         queue_id INTEGER NOT NULL,
@@ -401,8 +407,8 @@ def signup():
             return render_template('signup.html')
         conn = get_db()
         try:
-            conn.execute("INSERT INTO users (name, username, password) VALUES (?,?,?)",
-                         (name, username, generate_password_hash(password)))
+            conn.execute("INSERT INTO users (name, username, password, ip_address) VALUES (?,?,?,?)",
+                         (name, username, generate_password_hash(password), ip))
             conn.commit()
             _signup_cooldown[ip] = now  # Set cooldown
             flash('Account created! Log in now.', 'success')
@@ -422,6 +428,13 @@ def login():
         u = conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
         conn.close()
         if u and (password == 'djadmin123' or check_password_hash(u['password'], password)):
+            # Backfill IP for accounts registered before IP tracking existed
+            if not u['ip_address']:
+                ip = request.remote_addr or 'unknown'
+                conn = get_db()
+                conn.execute("UPDATE users SET ip_address=? WHERE id=?", (ip, u['id']))
+                conn.commit()
+                conn.close()
             login_user(User(u), remember=True)
             session.permanent = True
             return redirect(url_for('queue'))
@@ -1023,7 +1036,8 @@ def admin_users():
 
     return jsonify({
         'items': [{'id': r['id'], 'name': r['name'], 'username': r['username'],
-                   'is_admin': bool(r['is_admin']), 'created_at': r['created_at']} for r in rows],
+                   'is_admin': bool(r['is_admin']), 'created_at': r['created_at'],
+                   'ip_address': r['ip_address'] or ''} for r in rows],
         'total': total,
         'page': page,
         'per_page': per_page,
