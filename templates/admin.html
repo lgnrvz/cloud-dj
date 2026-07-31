@@ -270,9 +270,11 @@
 
             <div class="card">
                 <h2>Server</h2>
-                <div style="padding:10px 14px;font-size:0.78rem;line-height:1.7;">
-                    <strong style="color:#888;">Played:</strong> <span id="srvPlayed">{{ history|length }}</span> total<br>
-                    <strong style="color:#888;">Users:</strong> <span id="srvUsers">{{ users|length }}</span>
+                <div class="srv-info" style="padding:10px 14px;font-size:0.78rem;line-height:1.9;">
+                    <strong style="color:#888;">IP:</strong> <span id="srvIp">Loading...</span><br>
+                    <strong style="color:#888;">CPU:</strong> <span id="srvCpu">...</span><br>
+                    <strong style="color:#888;">RAM:</strong> <span id="srvRam">...</span><br>
+                    <strong style="color:#888;">Net:</strong> <span id="srvNet">...</span>
                 </div>
             </div>
 
@@ -356,6 +358,20 @@
         }).catch(() => {});
     }, 5000);
 
+    // Live system stats for the Server card
+    function loadSystem() {
+        fetch('/admin/system').then(r => r.json()).then(d => {
+            document.getElementById('srvIp').textContent = d.ip + ':' + location.port;
+            document.getElementById('srvCpu').textContent = d.cpu === null || d.cpu === undefined ? '—' : d.cpu + '%';
+            const ram = d.ram;
+            document.getElementById('srvRam').textContent = ram ? ram.used + ' GB / ' + ram.total + ' GB' : '—';
+            const net = d.net;
+            document.getElementById('srvNet').textContent = (net && net.down !== null) ? '↓ ' + net.down + ' KB/s  ↑ ' + net.up + ' KB/s' : '—';
+        }).catch(() => {});
+    }
+    loadSystem();
+    setInterval(loadSystem, 5000);
+
     // Load paginated history
     let curHistorySort = 'date';
     function loadHistory(page) {
@@ -382,6 +398,7 @@
                     + '</div>'
                     + '<div style="display:flex;align-items:center;gap:3px;">'
                     + '<span class="req-badge">' + item.request_count + 'x</span>'
+                    + '<button class="del-btn" style="color:#888;font-size:0.85rem;" onclick="addQueueFromHistory(' + item.id + ', this)" title="Add to queue">+</button>'
                     + '<button class="love-btn-sm' + (item.loved && item.user_id == currentUserId ? ' loved' : '') + '" onclick="adminLove(' + item.id + ', this)" title="Love">&#9825;</button>'
                     + '<a href="' + escapeHtml(item.clean_url || item.youtube_url || '') + '" target="_blank" class="view-btn" style="font-size:0.6rem;padding:3px 6px;">View</a>'
                     + '<button class="del-btn" onclick="deleteHistoryItem(' + item.id + ')" title="Delete">&#x2715;</button>'
@@ -398,6 +415,25 @@
         const pill = document.getElementById(idMap[sort]);
         if (pill) pill.classList.add('active');
         loadHistory(1);
+    }
+
+    /** Add a played song back to the queue from history */
+    function addQueueFromHistory(id, btn) {
+        btn.disabled = true;
+        btn.textContent = '...';
+        fetch('/replay/' + id, { method: 'POST' })
+            .then(r => r.json())
+            .then(d => {
+                if (d && d.success) {
+                    btn.textContent = '\u2713';
+                    btn.style.color = '#1db954';
+                } else {
+                    btn.textContent = '!';
+                    btn.style.color = '#ff4444';
+                }
+                setTimeout(() => { btn.disabled = false; btn.textContent = '+'; btn.style.color = ''; }, 1500);
+            })
+            .catch(() => { btn.disabled = false; btn.textContent = '+'; });
     }
 
     function escapeHtml(t) {

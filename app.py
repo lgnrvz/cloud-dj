@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, Response, stream_with_context, session
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_socketio import SocketIO, emit, join_room
-import sqlite3, os, threading, subprocess, re, signal, random, time, sys, hashlib, secrets
+import sqlite3, os, threading, subprocess, re, signal, random, time, sys, hashlib, secrets, socket
 from base64 import b64encode
 from datetime import datetime, timedelta
 
@@ -61,6 +61,81 @@ def _ban_state(banned_until):
         return False, None
     now_ph = datetime.utcnow() + timedelta(hours=8)
     return now_ph < until, until
+
+
+# ─── SYSTEM STATS (stdlib /proc parsing — Linux; None elsewhere) ───
+_sys_last = {}
+
+def _read_proc(path):
+    try:
+        with open(path) as f:
+            return f.read()
+    except (OSError, IOError):
+        return None
+
+def _lan_ip():
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(('10.255.255.255', 1))  # no packets actually sent
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        try:
+            return socket.gethostbyname(socket.gethostname())
+        except Exception:
+            return 'unknown'
+
+def _system_stats():
+    """CPU % / RAM / net speed from /proc. Deltas between polls."""
+    stat = _read_proc('/proc/stat')
+    mem = _read_proc('/proc/meminfo')
+    net = _read_proc('/proc/net/dev')
+    cpu = ram = None
+    net_speed = {'down': None, 'up': None}
+    if stat:
+        parts = stat.splitlines()[0].split()
+        if len(parts) >= 5 and parts[0] == 'cpu':
+            vals = [int(x) for x in parts[1:]]
+            total, idle = sum(vals), vals[3] + (vals[4] if len(vals) > 4 else 0)
+            last = _sys_last.get('cpu')
+            if last:
+                d_total = total - last[0]
+                d_idle = idle - last[1]
+                if d_total > 0:
+                    cpu = round(100 * (1 - d_idle / d_total), 1)
+            _sys_last['cpu'] = (total, idle)
+    if mem:
+        def _mem_kb(key):
+            for line in mem.splitlines():
+                if line.startswith(key + ':'):
+                    return int(line.split()[1])
+            return None
+        total_kb = _mem_kb('MemTotal')
+        avail_kb = _mem_kb('MemAvailable')
+        if total_kb:
+            used_kb = max(0, total_kb - (avail_kb or 0))
+            ram = {'used': round(used_kb / 1048576, 1), 'total': round(total_kb / 1048576, 1)}
+    if net:
+        rx = tx = 0
+        for line in net.splitlines()[2:]:
+            parts = line.split(':')
+            if len(parts) == 2:
+                vals = parts[1].split()
+                if len(vals) > 8:
+                    rx += int(vals[0])
+                    tx += int(vals[8])
+        now = time.time()
+        last = _sys_last.get('net')
+        if last:
+            dt = now - last[0]
+            if dt > 0:
+                net_speed = {
+                    'down': round(max(0, (rx - last[1])) / 1024 / dt, 1),
+                    'up': round(max(0, (tx - last[2])) / 1024 / dt, 1),
+                }
+        _sys_last['net'] = (now, rx, tx)
+    return {'ip': _lan_ip(), 'cpu': cpu, 'ram': ram, 'net': net_speed}
 
 
 app = Flask(__name__)
@@ -1117,6 +1192,13 @@ def admin_users():
         'per_page': per_page,
         'pages': (total + per_page - 1) // per_page
     })
+
+
+@app.route('/admin/system')
+@login_required
+def admin_system():
+    """Live system stats for the Server card: IP, CPU%, RAM, net speed."""
+    return jsonify(_system_stats())
 
 
 @app.route('/admin/users/<int:user_id>/ban', methods=['POST'])
