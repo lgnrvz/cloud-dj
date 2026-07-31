@@ -139,6 +139,24 @@ def _system_stats():
 
 
 app = Flask(__name__)
+
+# Short git commit hash of the running code (for the footer version)
+def _current_commit():
+    try:
+        out = subprocess.check_output(
+            ['git', 'rev-parse', '--short=7', 'HEAD'],
+            cwd=os.path.dirname(os.path.abspath(__file__)),
+            stderr=subprocess.DEVNULL, timeout=5
+        ).decode().strip()
+        return out or None
+    except Exception:
+        return None
+
+APP_COMMIT = _current_commit()
+
+@app.context_processor
+def inject_commit():
+    return {'app_version': APP_COMMIT or 'unknown'}
 # Persistent secret key — unique per install, survives restarts
 secret_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.secret_key')
 if os.path.isfile(secret_file):
