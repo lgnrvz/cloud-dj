@@ -212,11 +212,11 @@
         <!-- Left column: History + Import/Export -->
         <div>
             <div class="card">
-                <h2>History</h2>
-                <div style="padding:4px 18px 0;display:flex;justify-content:space-between;align-items:center;">
-                    <span style="color:#444;font-size:0.7rem;" id="histTotal">0 played</span>
-                    <div style="display:flex;align-items:center;gap:8px;">
-                        <button class="clr-btn" onclick="clearHistory()">Clear All</button>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid #1a1a2e;">
+                    <h2 style="padding:0;border-bottom:none;">History</h2>
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <span style="color:#444;font-size:0.7rem;" id="histTotal">0 played</span>
+                        <button class="clr-btn" onclick="clearHistory()" style="padding:4px 10px;">Clear All</button>
                     </div>
                 </div>
                 <div id="histList">
@@ -246,10 +246,12 @@
         <!-- Right column -->
         <div>
             <div class="card">
-                <h2>Users</h2>
-                <div style="padding:4px 18px 0;display:flex;justify-content:space-between;align-items:center;">
-                    <span style="color:#444;font-size:0.7rem;" id="usersTotal">0</span>
-                    <button class="clr-btn" onclick="clearUsers()" style="padding:4px 10px;">Clear All</button>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid #1a1a2e;">
+                    <h2 style="padding:0;border-bottom:none;">Users</h2>
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <span style="color:#444;font-size:0.7rem;" id="usersTotal">0</span>
+                        <button class="clr-btn" onclick="clearUsers()" style="padding:4px 10px;">Clear All</button>
+                    </div>
                 </div>
                 <div id="usersList">
                     <div style="padding:16px;text-align:center;color:#333;font-size:0.75rem;">Loading...</div>
