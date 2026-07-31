@@ -359,9 +359,10 @@
         .footer .sep { color: #2a2a3a; margin: 0 8px; }
 
         /* ─── Chat bubbles & emoji picker ─── */
-        .chat-msg { display: flex; flex-direction: column; gap: 2px; position: relative; }
-        .chat-msg.own { align-items: flex-end; }
-        .chat-msg.other { align-items: flex-start; }
+        .chat-msg { display: flex; flex-direction: column; gap: 2px; position: relative; width: 100%; }
+        .chat-msg.own { align-items: stretch; }
+        .chat-msg.other { align-items: stretch; }
+        .chat-msg.own .chat-head { align-items: flex-end; }
         .chat-head { display: flex; flex-direction: column; gap: 1px; padding: 0 4px; max-width: 100%; }
         .chat-name {
             font-weight: 600; font-size: 0.7rem; color: #888; line-height: 1.25;
