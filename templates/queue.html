@@ -531,6 +531,18 @@
             </div>
             {% endif %}
 
+            {% if not current_user.is_admin %}
+            <!-- Now Playing (shown to normal users when Auto-DJ is playing) -->
+            <div class="now-playing" id="userNowBar" style="display:none;">
+                <span class="indicator"></span>
+                <div class="np-content">
+                    <div class="label">Now Playing</div>
+                    <div class="track" id="userNowTrack"></div>
+                    <div class="meta" id="userNowMeta">Auto-DJ</div>
+                </div>
+            </div>
+            {% endif %}
+
             <!-- Queue -->
             <div class="card">
                 <div class="card-header"><span>Queue</span><span>{{ items|length }}</span></div>
@@ -1099,6 +1111,16 @@
             if (nm) nm.textContent = np.username || '-';
             const qc = document.getElementById('queueCount');
             if (qc) qc.textContent = (np.queue_count || 0) + ' in queue';
+            // Normal users: show Now Playing bar only while Auto-DJ is playing
+            const ub = document.getElementById('userNowBar');
+            if (ub) {
+                const isAutoDj = np.is_auto_dj && np.title && np.title !== 'Nothing playing';
+                ub.style.display = isAutoDj ? 'flex' : 'none';
+                if (isAutoDj) {
+                    const ut = document.getElementById('userNowTrack');
+                    if (ut) ut.textContent = np.title;
+                }
+            }
             if (lastQueueCount !== -1 && lastQueueCount !== np.queue_count) {
                 if (typeof refreshQueueList === 'function') refreshQueueList();
             }
