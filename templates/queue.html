@@ -1579,7 +1579,8 @@
             chatInput.value = chatInput.value.slice(0, start) + emoji + chatInput.value.slice(end);
             chatInput.selectionStart = chatInput.selectionEnd = start + emoji.length;
             chatInput.focus();
-            if (emojiPicker) emojiPicker.style.display = 'none';
+            // Keep the picker open so the user can insert multiple emojis;
+            // close it via the toggle button or clicking outside.
         };
 
         // Close pickers on outside click
