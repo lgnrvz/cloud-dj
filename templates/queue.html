@@ -381,12 +381,15 @@
         .emoji-grid button:hover { background: #1a1a2a; transform: scale(1.15); }
 
         /* ─── Chat reactions ─── */
-        .chat-row { display: flex; align-items: flex-end; gap: 4px; max-width: 100%; }
+        .chat-row { display: flex; align-items: flex-end; gap: 6px; max-width: 100%; }
         .chat-msg.own .chat-row { justify-content: flex-end; }
         .react-btn {
-            background: none; border: none; cursor: pointer; font-size: 0.85rem;
-            padding: 2px; line-height: 1; color: #666; transition: .15s; flex-shrink: 0;
+            background: none; border: none; cursor: pointer;
+            padding: 0 2px 5px 2px; line-height: 1; color: #666;
+            transition: .15s; flex-shrink: 0;
+            display: inline-flex; align-items: center;
         }
+        .react-btn svg { display: block; }
         .react-btn:hover { color: #1db954; transform: scale(1.1); }
         .chat-msg.own .react-btn { display: none; }
         .chat-reactions { display: none; gap: 4px; margin-top: 2px; padding: 0 4px; flex-wrap: wrap; }
@@ -1587,9 +1590,9 @@
             if (!isOwn) {
                 var reactBtn = document.createElement('button');
                 reactBtn.className = 'react-btn';
-                reactBtn.textContent = '🙂';
                 reactBtn.title = 'React';
                 reactBtn.type = 'button';
+                reactBtn.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0"/><path d="M9 10h.01M15 10h.01"/></svg>';
                 reactBtn.onclick = function() { openReactionPicker(this, msg.id); };
                 row.appendChild(reactBtn);
             }
