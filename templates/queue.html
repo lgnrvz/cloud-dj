@@ -338,9 +338,7 @@
         .status-text { color: #555; }
         .queue-count { color: #444; margin-left: auto; }
 
-        /* ─── Suggested refresh on hover ─── */
-        #suggestedRefresh { opacity: 0; }
-        #suggestedCount:hover #suggestedRefresh { opacity: 1; }
+        /* ─── Suggested refresh button ─── */
         #suggestedRefresh:hover { color: #1db954; }
 
         /* ─── Footer ─── */
@@ -452,8 +450,8 @@
             <div class="card" id="suggestedCard">
                 <div class="card-header">
                     <span>Suggested Songs</span>
-                    <span id="suggestedCount" style="color:#444;font-size:0.65rem;display:flex;align-items:center;gap:6px;cursor:default;" title="Hover for refresh">0s
-                        <button id="suggestedRefresh" onclick="manualRefreshSuggested()" title="Refresh suggestions" style="background:none;border:none;color:#666;cursor:pointer;font-size:0.75rem;line-height:1;padding:2px;transition:opacity .15s;">&#x21bb;</button>
+                    <span id="suggestedCount" style="color:#444;font-size:0.65rem;display:flex;align-items:center;gap:6px;">0s
+                        <button id="suggestedRefresh" onclick="manualRefreshSuggested()" title="Refresh suggestions" style="background:none;border:none;color:#666;cursor:pointer;font-size:0.75rem;line-height:1;padding:2px;">&#x21bb;</button>
                     </span>
                 </div>
                 <div id="suggestedList">
