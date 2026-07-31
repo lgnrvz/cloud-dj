@@ -1,0 +1,27 @@
+VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers=(1, 0, 1, 0),
+    prodvers=(1, 0, 1, 0),
+    mask=0x3f,
+    flags=0x0,
+    OS=0x40004,
+    fileType=0x1,
+    subtype=0x0,
+    date=(0, 0)
+  ),
+  kids=[
+    StringFileInfo([
+      StringTable(
+        u'040904B0',
+        [StringStruct(u'CompanyName', u'Cloud-DJ'),
+         StringStruct(u'FileDescription', u'Cloud-DJ LAN Music Server'),
+         StringStruct(u'FileVersion', u'1.0.1'),
+         StringStruct(u'InternalName', u'cloud-dj'),
+         StringStruct(u'OriginalFilename', u'cloud-dj.exe'),
+         StringStruct(u'ProductName', u'Cloud-DJ'),
+         StringStruct(u'ProductVersion', u'1.0.1'),
+         StringStruct(u'LegalCopyright', u'Copyright (C) 2026 Cloud-DJ')])
+    ]),
+    VarFileInfo([VarStruct(u'Translation', [1033, 1200])])
+  ]
+)

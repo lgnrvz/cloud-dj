@@ -35,6 +35,7 @@ jobs:
         run: |
           $yt = (Get-Command yt-dlp).Source
           pyinstaller --onefile --name cloud-dj --console `
+            --version-file "packaging\version_info.txt" `
             --add-binary "$yt;." `
             --add-binary "ffmpeg.exe;." `
             --add-binary "ffprobe.exe;." `
