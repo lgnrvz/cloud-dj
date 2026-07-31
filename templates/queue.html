@@ -450,7 +450,7 @@
             <div class="card" id="suggestedCard">
                 <div class="card-header">
                     <span>Suggested Songs</span>
-                    <span id="suggestedCount" style="color:#444;font-size:0.65rem;display:flex;align-items:center;gap:6px;">0s
+                    <span id="suggestedCount" style="color:#444;font-size:0.65rem;display:flex;align-items:center;gap:6px;"><span id="suggestedCountText">0s</span>
                         <button id="suggestedRefresh" onclick="manualRefreshSuggested()" title="Refresh suggestions" style="background:none;border:none;color:#888;cursor:pointer;padding:2px;display:inline-flex;align-items:center;"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg></button>
                     </span>
                 </div>
@@ -1379,14 +1379,13 @@
         if (timerLabel) timerLabel.textContent = '60s';
         refreshSuggested();
     }
-
     /** Refresh suggested songs from history */
     async function refreshSuggested() {
         try {
             const resp = await fetch('/suggested');
             if (!resp.ok) return;
             const d = await resp.json();
-            const countLabel = document.getElementById('suggestedCount');
+            const countLabel = document.getElementById('suggestedCountText');
             if (countLabel) countLabel.textContent = '60s';
             const list = document.getElementById('suggestedList');
             if (d.items.length === 0) {
@@ -1454,7 +1453,7 @@
 
     // Initial load + refresh every 60s (only if card is visible)
     if (document.getElementById('suggestedCard')) {
-        timerLabel = document.getElementById('suggestedCount');
+        timerLabel = document.getElementById('suggestedCountText');
         refreshSuggested();
         function tickTimer() {
             suggestedTimer--;
