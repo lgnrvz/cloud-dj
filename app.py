@@ -169,7 +169,10 @@ else:
 app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=365)
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=365)
 
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+# eventlet is Unix-friendly; on Windows it hangs the dev server at startup.
+# Fall back to the built-in threading async mode there (works everywhere).
+_ASYNC_MODE = 'threading' if sys.platform == 'win32' else 'eventlet'
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode=_ASYNC_MODE)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
