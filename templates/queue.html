@@ -1596,11 +1596,11 @@
         });
 
         // ─── Message reactions ───
-        var REACT_EMOJIS = ['👍','❤️','😂','🎉','🔥','😮','😢','🙏','👏','💯'];
+        var REACT_EMOJIS = [['👍','Like'],['😂','Haha'],['😮','Wow'],['😢','Sad'],['😡','Angry'],['🎵','Song Notes']];
         function buildReactPicker() {
             if (!reactPicker) return;
             reactPicker.innerHTML = REACT_EMOJIS.map(function(e) {
-                return '<button type="button" onclick="sendReaction(\'' + e + '\')">' + e + '</button>';
+                return '<button type="button" onclick="sendReaction(\'' + e[0] + '\')" title="' + e[1] + '">' + e[0] + '</button>';
             }).join('');
         }
         function renderReactions(msgId, wrapper) {
