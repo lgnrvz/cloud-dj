@@ -1128,6 +1128,13 @@
     safePoll();
     setInterval(safePoll, 4000);
 
+    // Self-healing: force re-render the queue list every 10s so a stale
+    // "now playing" item can never linger after the queue empties
+    // (count-based refresh alone can miss transitions where count is unchanged).
+    setInterval(function() {
+        if (typeof refreshQueueList === 'function') refreshQueueList();
+    }, 10000);
+
     // ─── Love Toggle ───
 
     function toggleLove(id, btn) {
