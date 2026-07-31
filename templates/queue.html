@@ -469,10 +469,8 @@
             <!-- Live Chat -->
             <div class="card" id="chatCard" style="display:flex;flex-direction:column;position:relative;">
                 <div class="card-header">
-                    <span style="display:flex;align-items:center;gap:6px;">Live Chat
-                        <button id="chatMinBtn" onclick="toggleChat()" style="background:none;border:1px solid #2a2a3a;border-radius:4px;color:#888;cursor:pointer;font-size:0.6rem;padding:2px 8px;font-family:inherit;transition:.15s;" onmouseover="this.style.color='#1db954';this.style.borderColor='#1db95444'" onmouseout="this.style.color='#888';this.style.borderColor='#2a2a3a'">Hide</button>
-                    </span>
-                    <span id="chatClock" style="color:#444;font-size:0.6rem;">&nbsp;</span>
+                    <span style="display:flex;align-items:center;gap:6px;"><span style="width:8px;height:8px;background:#1db954;border-radius:50%;display:inline-block;flex-shrink:0;"></span>Live Chat</span>
+                    <button id="chatMinBtn" onclick="toggleChat()" style="background:none;border:1px solid #2a2a3a;border-radius:4px;color:#888;cursor:pointer;font-size:0.6rem;padding:2px 8px;font-family:inherit;transition:.15s;" onmouseover="this.style.color='#1db954';this.style.borderColor='#1db95444'" onmouseout="this.style.color='#888';this.style.borderColor='#2a2a3a'">Hide</button>
                 </div>
                 <div id="chatMessages" style="height:350px;overflow-y:auto;padding:8px 12px;display:flex;flex-direction:column;gap:6px;font-size:0.75rem;"></div>
                 <div id="emojiPicker" style="display:none;position:absolute;bottom:50px;left:12px;right:12px;z-index:20;background:#0d0d16;border:1px solid #2a2a3a;border-radius:8px;padding:10px 12px;max-height:220px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.6);"></div>
@@ -601,7 +599,7 @@
 
             <!-- Loved Songs -->
             <div class="card">
-                <div class="card-header"><span>&#9829; Heart Songs</span><span id="lovedCount">{{ loved|length }}</span></div>
+                <div class="card-header"><span><span style="color:#ff4466;">&#9829;</span> Heart Songs</span><span id="lovedCount">{{ loved|length }}</span></div>
                 <div id="lovedList">
                     <div class="empty" style="padding:24px;"><p>Loading...</p></div>
                 </div>
@@ -1512,28 +1510,10 @@
         });
         var chatEl = document.getElementById('chatMessages');
         var chatInput = document.getElementById('chatInput');
-        var chatClock = document.getElementById('chatClock');
         var emojiPicker = document.getElementById('emojiPicker');
         var reactPicker = document.getElementById('reactPicker');
         var msgReactions = {};   // message id -> { emoji: [usernames] }
         var CURRENT_REACT_MSG = null;
-
-        // ─── Live clock in header (PH time) ───
-        function updateChatClock() {
-            if (!chatClock) return;
-            var now = new Date();
-            var parts = new Intl.DateTimeFormat('en-US', {
-                timeZone: 'Asia/Manila', month: 'long', day: 'numeric',
-                hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
-            }).formatToParts(now);
-            var get = function(t) {
-                var p = parts.find(function(x) { return x.type === t; });
-                return p ? p.value : '';
-            };
-            chatClock.textContent = get('month') + ' ' + get('day') + ' - ' + get('hour') + ':' + get('minute');
-        }
-        updateChatClock();
-        setInterval(updateChatClock, 10000);
 
         // ─── Emoji picker (categorized) ───
         var EMOJI_CATS = [
