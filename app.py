@@ -885,15 +885,30 @@ def replay_from_history(item_id):
 @app.route('/suggested')
 @login_required
 def suggested():
-    """Return 10 random songs from history for the suggested card."""
+    """Return random songs from history for the suggested card.
+    Supports ?limit=N and ?exclude=id1,id2 to exclude already-listed items."""
+    limit = min(request.args.get('limit', 5, type=int), 10)
+    exclude_ids = []
+    for x in request.args.get('exclude', '').split(','):
+        try:
+            exclude_ids.append(int(x))
+        except (ValueError, TypeError):
+            pass
     conn = get_db()
     # Get played songs, excluding any already in the queue
-    rows = conn.execute(
+    sql = (
         "SELECT id, title, username, clean_url FROM queue "
         "WHERE status='played' AND clean_url NOT IN "
-        "(SELECT clean_url FROM queue WHERE status != 'played') "
-        "GROUP BY clean_url ORDER BY RANDOM() LIMIT 5"
-    ).fetchall()
+        "(SELECT clean_url FROM queue WHERE status != 'played')"
+    )
+    params = []
+    if exclude_ids:
+        ph = ','.join('?' * len(exclude_ids))
+        sql += f" AND id NOT IN ({ph})"
+        params.extend(exclude_ids)
+    sql += " GROUP BY clean_url ORDER BY RANDOM() LIMIT ?"
+    params.append(limit)
+    rows = conn.execute(sql, params).fetchall()
     conn.close()
     return jsonify({
         'items': [{

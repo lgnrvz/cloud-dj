@@ -1417,13 +1417,40 @@
             .then(d => {
                 if (d && d.success) {
                     showToast('Added: ' + d.title);
-                    btn.textContent = '\u2713';
-                    btn.style.color = '#1db954';
-                    setTimeout(() => { btn.disabled = false; btn.textContent = '+'; btn.style.color = ''; }, 2000);
+                    // Remove the row, then fill the slot with a fresh random song
+                    const row = btn.closest('.loved-item');
+                    if (row) row.remove();
+                    fillSuggestedSlot();
                     refreshQueueList();
                 }
             })
             .catch(() => { showToast('Failed', 'error'); btn.disabled = false; btn.textContent = '+'; });
+    }
+
+    /** Fetch one new random suggestion (excluding current list) to fill a slot */
+    async function fillSuggestedSlot() {
+        const list = document.getElementById('suggestedList');
+        if (!list) return;
+        const ids = [];
+        list.querySelectorAll('.add-btn').forEach(b => {
+            const m = (b.getAttribute('onclick') || '').match(/addSuggested\((\d+)/);
+            if (m) ids.push(m[1]);
+        });
+        try {
+            const resp = await fetch('/suggested?limit=1&exclude=' + ids.join(','));
+            if (!resp.ok) return;
+            const d = await resp.json();
+            if (!d.items.length) return;
+            const item = d.items[0];
+            const row = document.createElement('div');
+            row.className = 'loved-item';
+            row.style.cssText = 'padding:8px 12px;';
+            row.innerHTML = '<div class="title" style="font-size:0.75rem;">' + escapeHtml(item.title) + '</div>'
+                + '<div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">'
+                + '<button class="add-btn" style="font-size:0.65rem;padding:2px 6px;" onclick="addSuggested(' + item.id + ', this)">+</button>'
+                + '</div>';
+            list.appendChild(row);
+        } catch(e) {}
     }
 
     // Initial load + refresh every 60s (only if card is visible)
