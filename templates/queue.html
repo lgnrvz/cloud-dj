@@ -540,7 +540,7 @@
                             <div class="title">{{ item.title or 'Loading...' }}</div>
                             <div class="sub">
                                 <span>{{ item.username }}</span>
-                                <span>{{ item.created_at[-5:] }}</span>
+                                <span>{{ item.created_at_ph }}</span>
                                 {% if item.status == 'playing' %}<span class="badge badge-playing">Playing</span>{% endif %}
                             </div>
                         </div>

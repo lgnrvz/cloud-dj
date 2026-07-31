@@ -546,10 +546,13 @@ def logout():
 def queue():
     conn = get_db()
     items = conn.execute(
-        "SELECT * FROM queue WHERE status != 'played' ORDER BY CASE WHEN status='playing' THEN 0 ELSE 1 END, priority DESC, id ASC"
+        "SELECT *, strftime('%H:%M', created_at, '+8 hours') as created_at_ph "
+        "FROM queue WHERE status != 'played' "
+        "ORDER BY CASE WHEN status='playing' THEN 0 ELSE 1 END, priority DESC, id ASC"
     ).fetchall()
     played = conn.execute(
-        "SELECT * FROM queue WHERE status='played' ORDER BY id DESC LIMIT 10"
+        "SELECT *, strftime('%H:%M', created_at, '+8 hours') as created_at_ph "
+        "FROM queue WHERE status='played' ORDER BY id DESC LIMIT 10"
     ).fetchall()
     loved = conn.execute(
         "SELECT * FROM loved_songs WHERE user_id=? ORDER BY loved_at DESC LIMIT 50",
@@ -1184,7 +1187,8 @@ def admin_history():
     total = conn.execute("SELECT COUNT(*) as c FROM queue WHERE status='played'").fetchone()['c']
     rows = conn.execute("""
         SELECT q.*,
-            (SELECT COUNT(*) FROM queue WHERE clean_url = q.clean_url) as request_count
+            (SELECT COUNT(*) FROM queue WHERE clean_url = q.clean_url) as request_count,
+            strftime('%Y-%m-%d %H:%M', q.created_at, '+8 hours') as created_at_ph
         FROM queue q
         WHERE q.status='played'
         ORDER BY q.id DESC LIMIT ? OFFSET ?
@@ -1367,7 +1371,7 @@ def save_score():
 def leaderboard():
     conn = get_db()
     rows = conn.execute(
-        "SELECT score, title, username, created_at FROM scores ORDER BY score DESC LIMIT 10"
+        "SELECT score, title, username, strftime('%Y-%m-%d', created_at, '+8 hours') as created_at FROM scores ORDER BY score DESC LIMIT 10"
     ).fetchall()
     conn.close()
     return jsonify([dict(r) for r in rows])

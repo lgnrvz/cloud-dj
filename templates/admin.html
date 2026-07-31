@@ -357,7 +357,7 @@
                     '<div class="history-item">'
                     + '<div class="info">'
                     + '<div class="title">' + escapeHtml(item.title || 'Unknown') + '</div>'
-                    + '<div class="sub"><span>' + escapeHtml(item.username) + '</span><span>' + (item.created_at || '') + '</span></div>'
+                    + '<div class="sub"><span>' + escapeHtml(item.username) + '</span><span>' + (item.created_at_ph || item.created_at || '') + '</span></div>'
                     + '</div>'
                     + '<div style="display:flex;align-items:center;gap:3px;">'
                     + '<span class="req-badge">' + item.request_count + 'x</span>'
