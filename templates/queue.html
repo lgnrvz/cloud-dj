@@ -359,9 +359,18 @@
             font-weight: 600; font-size: 0.7rem; color: #888; line-height: 1.25;
             display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
             overflow: hidden; word-break: break-all; max-width: 180px;
+            position: relative; cursor: default;
         }
         .chat-name.admin { color: #1db954; }
-        .chat-time { font-size: 0.55rem; color: #444; line-height: 1; }
+        .chat-name::after {
+            content: attr(data-time);
+            position: absolute; left: 0; top: 100%; margin-top: 2px;
+            background: #1a1a2a; border: 1px solid #2a2a3a; color: #999;
+            font-size: 0.55rem; padding: 1px 5px; border-radius: 4px;
+            white-space: nowrap; opacity: 0; pointer-events: none;
+            transition: opacity .12s; z-index: 10;
+        }
+        .chat-name:hover::after { opacity: 1; }
         .chat-bubble {
             max-width: 85%; padding: 6px 10px; border-radius: 8px;
             background: #1a1a2a; border: 1px solid #2a2a3a;
@@ -1575,11 +1584,8 @@
             var name = document.createElement('span');
             name.className = 'chat-name' + (msg.is_admin ? ' admin' : '');
             name.textContent = msg.username;
-            var time = document.createElement('span');
-            time.className = 'chat-time';
-            time.textContent = msg.time || '';
+            if (msg.time) name.dataset.time = msg.time;
             head.appendChild(name);
-            head.appendChild(time);
             var bubble = document.createElement('div');
             bubble.className = 'chat-bubble';
             bubble.innerHTML = linkify(msg.message);
