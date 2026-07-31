@@ -29,7 +29,9 @@
         .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
         @media (max-width: 768px) { .container { padding: 8px; } }
 
-        .admin-grid { display: grid; grid-template-columns: 4fr 1fr; gap: 16px; align-items: start; }
+        .admin-grid { display: grid; grid-template-columns: 4fr 1fr; gap: 16px; align-items: stretch; }
+        .admin-grid > div { display: flex; flex-direction: column; }
+        .admin-grid > div > .card:last-child { flex: 1; }
         .admin-grid .full { grid-column: 1 / -1; }
         @media (max-width: 600px) { .admin-grid { grid-template-columns: 1fr; } }
         @media (max-width: 768px) {
@@ -98,6 +100,7 @@
         .history-item:last-child { border-bottom: none; }
         .history-item:hover { background: #111122; }
         .history-item .info { flex: 1; min-width: 0; }
+        #histList { flex: 1; min-height: 0; }
         .history-item .title { font-weight: 500; color: #e0e0e8; font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .history-item .sub { font-size: 0.65rem; color: #555; margin-top: 2px; }
         .history-item .sub span { margin-right: 10px; }
@@ -211,7 +214,7 @@
                 </div>
             </div>
 
-            <div class="card">
+            <div class="card" style="display:flex;flex-direction:column;">
                 <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid #1a1a2e;">
                     <h2 style="padding:0;border-bottom:none;">History</h2>
                     <div style="display:flex;align-items:center;gap:10px;">
