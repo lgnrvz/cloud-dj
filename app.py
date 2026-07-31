@@ -892,7 +892,7 @@ def suggested():
         "SELECT id, title, username, clean_url FROM queue "
         "WHERE status='played' AND clean_url NOT IN "
         "(SELECT clean_url FROM queue WHERE status != 'played') "
-        "GROUP BY clean_url ORDER BY RANDOM() LIMIT 10"
+        "GROUP BY clean_url ORDER BY RANDOM() LIMIT 5"
     ).fetchall()
     conn.close()
     return jsonify({

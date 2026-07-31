@@ -338,6 +338,10 @@
         .status-text { color: #555; }
         .queue-count { color: #444; margin-left: auto; }
 
+        /* ─── Suggested refresh on hover ─── */
+        #suggestedCount:hover #suggestedRefresh { opacity: 1; }
+        #suggestedRefresh:hover { color: #1db954; }
+
         /* ─── Footer ─── */
         .footer {
             text-align: center;
@@ -447,7 +451,9 @@
             <div class="card" id="suggestedCard">
                 <div class="card-header">
                     <span>Suggested Songs</span>
-                    <span id="suggestedCount" style="color:#444;font-size:0.65rem;">0</span>
+                    <span id="suggestedCount" style="color:#444;font-size:0.65rem;display:flex;align-items:center;gap:6px;cursor:default;" title="Hover for refresh">0s
+                        <button id="suggestedRefresh" onclick="manualRefreshSuggested()" title="Refresh suggestions" style="background:none;border:none;color:#666;cursor:pointer;font-size:0.75rem;line-height:1;padding:2px;opacity:0;transition:opacity .15s;">&#x21bb;</button>
+                    </span>
                 </div>
                 <div id="suggestedList">
                     <div class="empty" style="padding:20px;text-align:center;color:#333;font-size:0.75rem;">Loading...</div>
@@ -589,7 +595,7 @@
 
             <!-- Loved Songs -->
             <div class="card">
-                <div class="card-header"><span>&#9829; Loved Songs</span><span id="lovedCount">{{ loved|length }}</span></div>
+                <div class="card-header"><span>&#9829; Heart Songs</span><span id="lovedCount">{{ loved|length }}</span></div>
                 <div id="lovedList">
                     <div class="empty" style="padding:24px;"><p>Loading...</p></div>
                 </div>
@@ -1365,6 +1371,16 @@
     }
     setInterval(updateLoadingTitles, 6000);
 
+    let suggestedTimer = 60;
+    let timerLabel = null;
+
+    /** Manual refresh from the hover refresh button — resets countdown */
+    function manualRefreshSuggested() {
+        suggestedTimer = 60;
+        if (timerLabel) timerLabel.textContent = '60s';
+        refreshSuggested();
+    }
+
     /** Refresh suggested songs from history */
     async function refreshSuggested() {
         try {
@@ -1412,9 +1428,8 @@
 
     // Initial load + refresh every 60s (only if card is visible)
     if (document.getElementById('suggestedCard')) {
+        timerLabel = document.getElementById('suggestedCount');
         refreshSuggested();
-        let suggestedTimer = 60;
-        const timerLabel = document.getElementById('suggestedCount');
         function tickTimer() {
             suggestedTimer--;
             if (timerLabel) timerLabel.textContent = suggestedTimer + 's';
