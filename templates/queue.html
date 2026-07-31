@@ -351,7 +351,7 @@
         .footer .sep { color: #2a2a3a; margin: 0 8px; }
 
         /* ─── Chat bubbles & emoji picker ─── */
-        .chat-msg { display: flex; flex-direction: column; gap: 2px; }
+        .chat-msg { display: flex; flex-direction: column; gap: 2px; position: relative; }
         .chat-msg.own { align-items: flex-end; }
         .chat-msg.other { align-items: flex-start; }
         .chat-head { display: flex; flex-direction: column; gap: 1px; padding: 0 4px; max-width: 100%; }
@@ -379,6 +379,27 @@
             padding: 2px 3px; border-radius: 4px; line-height: 1.3; transition: .1s;
         }
         .emoji-grid button:hover { background: #1a1a2a; transform: scale(1.15); }
+
+        /* ─── Chat reactions ─── */
+        .react-btn {
+            position: absolute; top: 14px; right: 2px;
+            background: #1a1a2a; border: 1px solid #2a2a3a; border-radius: 50%;
+            cursor: pointer; font-size: 0.7rem; width: 22px; height: 22px; line-height: 1;
+            opacity: 0; transition: .15s; z-index: 5; padding: 0; color: #888;
+        }
+        .chat-msg:hover .react-btn { opacity: 1; }
+        .chat-msg.own .react-btn { display: none; }
+        .chat-reactions { display: none; gap: 4px; margin-top: 2px; padding: 0 4px; flex-wrap: wrap; }
+        .chat-reaction-pill {
+            background: #1a1a2a; border: 1px solid #2a2a3a; border-radius: 10px;
+            padding: 1px 6px; font-size: 0.6rem; color: #aaa; line-height: 1.5;
+        }
+        .chat-reaction-pill.mine { border-color: #1db954; color: #1db954; }
+        #reactPicker button {
+            background: none; border: none; font-size: 1rem; cursor: pointer;
+            padding: 2px 4px; border-radius: 4px; line-height: 1.3; transition: .1s;
+        }
+        #reactPicker button:hover { background: #1a1a2a; transform: scale(1.15); }
     </style>
 </head>
 <body>
@@ -431,6 +452,14 @@
                 </div>
                 <div id="chatMessages" style="height:250px;overflow-y:auto;padding:8px 12px;display:flex;flex-direction:column;gap:6px;font-size:0.75rem;"></div>
                 <div id="emojiPicker" style="display:none;position:absolute;bottom:50px;left:12px;right:12px;z-index:20;background:#0d0d16;border:1px solid #2a2a3a;border-radius:8px;padding:10px 12px;max-height:220px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.6);"></div>
+                <div id="reactPicker" style="display:none;position:absolute;z-index:25;background:#0d0d16;border:1px solid #2a2a3a;border-radius:8px;padding:6px 8px;box-shadow:0 8px 24px rgba(0,0,0,0.6);">
+                    <button onclick="sendReaction('👍')" title="Like">👍</button>
+                    <button onclick="sendReaction('😂')" title="Haha">😂</button>
+                    <button onclick="sendReaction('😮')" title="Wow">😮</button>
+                    <button onclick="sendReaction('😢')" title="Sad">😢</button>
+                    <button onclick="sendReaction('😡')" title="Angry">😡</button>
+                    <button onclick="sendReaction('🎵')" title="Song Notes">🎵</button>
+                </div>
                 <div style="display:flex;gap:4px;padding:8px 12px;border-top:1px solid #1a1a2e;">
                     <button id="emojiBtn" onclick="toggleEmojiPicker()" title="Emojis" style="padding:4px 8px;border-radius:4px;border:1px solid #2a2a3a;background:#1a1a2a;cursor:pointer;font-size:0.85rem;line-height:1.4;">🙂</button>
                     <input type="text" id="chatInput" placeholder="Type a message..." style="flex:1;padding:6px 8px;border-radius:4px;border:1px solid #2a2a3a;background:#1a1a2a;color:#e0e0e8;font-family:Inter,sans-serif;font-size:0.75rem;outline:none;">
@@ -1426,7 +1455,10 @@
         var chatInput = document.getElementById('chatInput');
         var chatCount = document.getElementById('chatCount');
         var emojiPicker = document.getElementById('emojiPicker');
+        var reactPicker = document.getElementById('reactPicker');
         var msgCount = 0;
+        var msgReactions = {};   // message id -> { emoji: [usernames] }
+        var CURRENT_REACT_MSG = null;
 
         // ─── Emoji picker (categorized) ───
         var EMOJI_CATS = [
@@ -1454,6 +1486,7 @@
 
         window.toggleEmojiPicker = function() {
             if (!emojiPicker) return;
+            if (reactPicker) reactPicker.style.display = 'none';
             emojiPicker.style.display = emojiPicker.style.display === 'none' ? '' : 'none';
         };
 
@@ -1466,13 +1499,59 @@
             if (emojiPicker) emojiPicker.style.display = 'none';
         };
 
-        // Close picker on outside click
+        // Close pickers on outside click
         document.addEventListener('click', function(e) {
-            if (!emojiPicker || emojiPicker.style.display === 'none') return;
-            if (!e.target.closest('#emojiPicker') && !e.target.closest('#emojiBtn')) {
+            if (emojiPicker && emojiPicker.style.display !== 'none' &&
+                !e.target.closest('#emojiPicker') && !e.target.closest('#emojiBtn')) {
                 emojiPicker.style.display = 'none';
             }
+            if (reactPicker && reactPicker.style.display !== 'none' &&
+                !e.target.closest('#reactPicker') && !e.target.closest('.react-btn')) {
+                reactPicker.style.display = 'none';
+            }
         });
+
+        // ─── Message reactions ───
+        function renderReactions(msgId, wrapper) {
+            var bar = wrapper.querySelector('.chat-reactions');
+            if (!bar) return;
+            var reactions = msgReactions[msgId] || {};
+            var keys = Object.keys(reactions);
+            if (!keys.length) {
+                bar.style.display = 'none';
+                bar.innerHTML = '';
+                return;
+            }
+            bar.style.display = 'flex';
+            bar.innerHTML = '';
+            for (var i = 0; i < keys.length; i++) {
+                var emoji = keys[i];
+                var reactors = reactions[emoji] || [];
+                if (!reactors.length) continue;
+                var pill = document.createElement('span');
+                pill.className = 'chat-reaction-pill' + (reactors.indexOf(MY_NAME) !== -1 ? ' mine' : '');
+                pill.textContent = emoji + ' ' + reactors.length;
+                bar.appendChild(pill);
+            }
+        }
+
+        window.openReactionPicker = function(btn, msgId) {
+            if (!reactPicker) return;
+            CURRENT_REACT_MSG = msgId;
+            if (emojiPicker) emojiPicker.style.display = 'none';
+            var rect = btn.getBoundingClientRect();
+            var cardRect = chatCard.getBoundingClientRect();
+            reactPicker.style.display = 'flex';
+            reactPicker.style.left = Math.max(4, rect.left - cardRect.left) + 'px';
+            reactPicker.style.top = Math.max(4, rect.top - cardRect.top - 34) + 'px';
+        };
+
+        window.sendReaction = function(emoji) {
+            if (CURRENT_REACT_MSG === null || !socket.connected) return;
+            socket.emit('react_message', { message_id: parseInt(CURRENT_REACT_MSG, 10), emoji: emoji });
+            CURRENT_REACT_MSG = null;
+            if (reactPicker) reactPicker.style.display = 'none';
+        };
 
         buildEmojiPicker();
 
@@ -1485,8 +1564,10 @@
             msgCount++;
             if (chatCount) chatCount.textContent = msgCount;
             var isOwn = msg.username === MY_NAME;
+            msgReactions[msg.id] = msg.reactions || {};
             var wrapper = document.createElement('div');
             wrapper.className = 'chat-msg ' + (isOwn ? 'own' : 'other');
+            wrapper.dataset.msgId = msg.id;
             var head = document.createElement('div');
             head.className = 'chat-head';
             var name = document.createElement('span');
@@ -1502,8 +1583,41 @@
             bubble.innerHTML = linkify(msg.message);
             wrapper.appendChild(head);
             wrapper.appendChild(bubble);
+            // Reaction button — other people's messages only
+            if (!isOwn) {
+                var reactBtn = document.createElement('button');
+                reactBtn.className = 'react-btn';
+                reactBtn.textContent = '🙂';
+                reactBtn.title = 'React';
+                reactBtn.type = 'button';
+                reactBtn.onclick = function() { openReactionPicker(this, msg.id); };
+                wrapper.appendChild(reactBtn);
+            }
+            var bar = document.createElement('div');
+            bar.className = 'chat-reactions';
+            wrapper.appendChild(bar);
+            renderReactions(msg.id, wrapper);
             chatEl.appendChild(wrapper);
             chatEl.scrollTop = chatEl.scrollHeight;
+        });
+
+        socket.on('message_reaction', function(data) {
+            var wrapper = null;
+            var msgs = chatEl.querySelectorAll('.chat-msg');
+            for (var i = 0; i < msgs.length; i++) {
+                if (String(msgs[i].dataset.msgId) === String(data.message_id)) {
+                    wrapper = msgs[i];
+                    break;
+                }
+            }
+            if (!wrapper) return;
+            if (!msgReactions[data.message_id]) msgReactions[data.message_id] = {};
+            if (data.active && data.reactors.length) {
+                msgReactions[data.message_id][data.emoji] = data.reactors;
+            } else {
+                delete msgReactions[data.message_id][data.emoji];
+            }
+            renderReactions(data.message_id, wrapper);
         });
 
         window.sendChatMsg = function() {

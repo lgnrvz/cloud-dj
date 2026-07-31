@@ -196,6 +196,13 @@ def init_db():
         is_admin INTEGER DEFAULT 0,
         created_at TEXT DEFAULT (datetime('now', 'localtime'))
     )""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS chat_reactions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        message_id INTEGER NOT NULL,
+        emoji TEXT NOT NULL,
+        username TEXT NOT NULL,
+        UNIQUE(message_id, emoji, username)
+    )""")
     # FTS5 index for history search — wrap in try/except to prevent DB corruption from crashing startup
     try:
         conn.execute(
@@ -1381,19 +1388,30 @@ def handle_connect():
     if not current_user.is_authenticated:
         return False  # Reject connection
     join_room('chat')
-    # Send recent messages from DB
+    # Send recent messages from DB, with their reactions
     conn = get_db()
     rows = conn.execute(
-        "SELECT username, message, is_admin, strftime('%H:%M', created_at, '+8 hours') as time "
+        "SELECT id, username, message, is_admin, strftime('%H:%M', created_at, '+8 hours') as time "
         "FROM chat_messages ORDER BY id DESC LIMIT 50"
     ).fetchall()
+    ids = [r['id'] for r in rows]
+    reactions = {}
+    if ids:
+        ph = ','.join('?' * len(ids))
+        for r in conn.execute(
+            f"SELECT message_id, emoji, username FROM chat_reactions WHERE message_id IN ({ph}) ORDER BY id",
+            ids
+        ):
+            reactions.setdefault(r['message_id'], {}).setdefault(r['emoji'], []).append(r['username'])
     conn.close()
     for row in reversed(rows):
         emit('chat_message', {
+            'id': row['id'],
             'username': row['username'],
             'message': row['message'],
             'is_admin': row['is_admin'],
-            'time': row['time'] or ''
+            'time': row['time'] or '',
+            'reactions': reactions.get(row['id'], {})
         })
 
 
@@ -1412,25 +1430,76 @@ def handle_send_message(data):
         )
         conn.commit()
         row = conn.execute(
-            "SELECT strftime('%H:%M', created_at, '+8 hours') as time "
+            "SELECT id, strftime('%H:%M', created_at, '+8 hours') as time "
             "FROM chat_messages WHERE id=last_insert_rowid()"
         ).fetchone()
         conn.close()
         entry = {
+            'id': row['id'] if row else None,
             'username': current_user.username,
             'message': msg,
             'is_admin': current_user.is_admin,
-            'time': row['time'] if row else ''
+            'time': row['time'] if row else '',
+            'reactions': {}
         }
         emit('chat_message', entry, room='chat', broadcast=True)
-        # Trim old messages (keep last 500)
+        # Trim old messages (keep last 500) + orphaned reactions
         conn = get_db()
         conn.execute(
             "DELETE FROM chat_messages WHERE id NOT IN "
             "(SELECT id FROM chat_messages ORDER BY id DESC LIMIT 500)"
         )
+        conn.execute(
+            "DELETE FROM chat_reactions WHERE message_id NOT IN (SELECT id FROM chat_messages)"
+        )
         conn.commit()
         conn.close()
+    except Exception:
+        pass
+
+
+CHAT_REACTIONS_ALLOWED = {'👍', '😂', '😮', '😢', '😡', '🎵'}
+
+
+@socketio.on('react_message')
+def handle_react_message(data):
+    """Toggle a reaction (Like/Haha/Wow/Sad/Angry/Song Notes) on a chat message."""
+    if not current_user.is_authenticated:
+        return
+    msg_id = data.get('message_id')
+    emoji = data.get('emoji', '')
+    if not isinstance(msg_id, int) or emoji not in CHAT_REACTIONS_ALLOWED:
+        return
+    try:
+        conn = get_db()
+        exists = conn.execute("SELECT id FROM chat_messages WHERE id=?", (msg_id,)).fetchone()
+        if not exists:
+            conn.close()
+            return
+        existing = conn.execute(
+            "SELECT id FROM chat_reactions WHERE message_id=? AND emoji=? AND username=?",
+            (msg_id, emoji, current_user.username)
+        ).fetchone()
+        if existing:
+            conn.execute("DELETE FROM chat_reactions WHERE id=?", (existing['id'],))
+        else:
+            conn.execute(
+                "INSERT INTO chat_reactions (message_id, emoji, username) VALUES (?,?,?)",
+                (msg_id, emoji, current_user.username)
+            )
+        conn.commit()
+        reactors = [r['username'] for r in conn.execute(
+            "SELECT username FROM chat_reactions WHERE message_id=? AND emoji=? ORDER BY id",
+            (msg_id, emoji)
+        ).fetchall()]
+        conn.close()
+        emit('message_reaction', {
+            'message_id': msg_id,
+            'emoji': emoji,
+            'username': current_user.username,
+            'active': not existing,
+            'reactors': reactors
+        }, room='chat', broadcast=True)
     except Exception:
         pass
 
