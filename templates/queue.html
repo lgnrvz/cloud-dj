@@ -1595,6 +1595,13 @@
         });
 
         // ─── Message reactions ───
+        var REACT_EMOJIS = ['👍','❤️','😂','🎉','🔥','😮','😢','🙏','👏','💯'];
+        function buildReactPicker() {
+            if (!reactPicker) return;
+            reactPicker.innerHTML = REACT_EMOJIS.map(function(e) {
+                return '<button type="button" onclick="sendReaction(\'' + e + '\')">' + e + '</button>';
+            }).join('');
+        }
         function renderReactions(msgId, wrapper) {
             var bar = wrapper.querySelector('.chat-reactions');
             if (!bar) return;
@@ -1646,6 +1653,7 @@
         };
 
         buildEmojiPicker();
+        buildReactPicker();
 
         // ─── Socket events ───
         socket.on('connect', function() { console.log('[chat] connected'); });
