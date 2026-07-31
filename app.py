@@ -448,8 +448,10 @@ def get_next_pending():
     Also cleans up stale 'playing' items (stuck from crashes)."""
     conn = get_db()
     # Reset any stale 'playing' items to 'played' (they never advanced)
+    # NOTE: NOW_PLAYING['id'] may be None (after restart) or -1 (auto-dj);
+    # SQL 'id != NULL' is always false, so coerce None -> -1 to make cleanup work.
     conn.execute("UPDATE queue SET status='played' WHERE status='playing' AND id != ?",
-                 (NOW_PLAYING.get('id', -1),))
+                 (NOW_PLAYING.get('id', -1) or -1,))
     conn.commit()
     item = conn.execute(
         "SELECT * FROM queue WHERE status='pending' ORDER BY priority DESC, id ASC LIMIT 1"
