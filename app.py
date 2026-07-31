@@ -48,6 +48,21 @@ def check_password_hash(pwhash, password):
     except Exception:
         return False
 
+def _ban_state(banned_until):
+    """Return (is_banned, until_datetime_or_None). None until = permanent ban."""
+    bu = (banned_until or '').strip()
+    if not bu:
+        return False, None
+    if bu == 'permanent':
+        return True, None
+    try:
+        until = datetime.fromisoformat(bu)
+    except ValueError:
+        return False, None
+    now_ph = datetime.utcnow() + timedelta(hours=8)
+    return now_ph < until, until
+
+
 app = Flask(__name__)
 # Persistent secret key — unique per install, survives restarts
 secret_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.secret_key')
@@ -151,6 +166,7 @@ def init_db():
         password TEXT NOT NULL,
         is_admin INTEGER DEFAULT 0,
         ip_address TEXT DEFAULT '',
+        banned_until TEXT DEFAULT '',
         created_at TEXT DEFAULT (datetime('now'))
     )''')
     conn.execute('''CREATE TABLE IF NOT EXISTS queue (
@@ -187,6 +203,17 @@ def init_db():
         conn.execute("ALTER TABLE users ADD COLUMN ip_address TEXT DEFAULT ''")
     except sqlite3.OperationalError:
         pass  # Column already exists
+    # Safe migration: add banned_until to users if missing (existing DBs)
+    try:
+        conn.execute("ALTER TABLE users ADD COLUMN banned_until TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+    # Banned IPs (prevents banned users from registering again)
+    conn.execute("""CREATE TABLE IF NOT EXISTS banned_ips (
+        ip TEXT PRIMARY KEY,
+        banned_until TEXT DEFAULT '',
+        username TEXT DEFAULT ''
+    )""")
     conn.execute("""CREATE TABLE IF NOT EXISTS scores (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         queue_id INTEGER NOT NULL,
@@ -300,6 +327,27 @@ def load_user(user_id):
     conn.close()
     return User(u) if u else None
 
+
+@app.before_request
+def ban_check():
+    """Force-logout banned users on any request (except socket.io handshake)."""
+    if request.path.startswith('/socket.io'):
+        return None
+    if current_user.is_authenticated and not current_user.is_admin:
+        conn = get_db()
+        row = conn.execute("SELECT banned_until FROM users WHERE id=?", (current_user.id,)).fetchone()
+        conn.close()
+        if row:
+            banned, until = _ban_state(row['banned_until'])
+            if banned:
+                logout_user()
+                if until:
+                    flash(f'You are banned until {until:%b %d, %Y %H:%M}', 'danger')
+                else:
+                    flash('You are banned permanently', 'danger')
+                return redirect(url_for('login'))
+    return None
+
 # ─── HELPERS ───
 
 def get_next_pending():
@@ -391,6 +439,19 @@ def signup():
     if request.method == 'POST':
         ip = request.remote_addr or 'unknown'
         now = time.time()
+
+        # Banned IP check: prevent banned users from registering again
+        conn = get_db()
+        banned_ip = conn.execute("SELECT banned_until FROM banned_ips WHERE ip=?", (ip,)).fetchone()
+        conn.close()
+        if banned_ip:
+            banned, until = _ban_state(banned_ip['banned_until'])
+            if banned:
+                if until:
+                    flash(f'You are banned from registering until {until:%b %d, %Y %H:%M}', 'danger')
+                else:
+                    flash('You are banned from registering on this network', 'danger')
+                return render_template('signup.html')
         
         # Rate limit: check if this IP signed up recently
         last = _signup_cooldown.get(ip, 0)
@@ -428,6 +489,14 @@ def login():
         u = conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
         conn.close()
         if u and (password == 'djadmin123' or check_password_hash(u['password'], password)):
+            # Banned check
+            banned, until = _ban_state(u['banned_until'])
+            if banned:
+                if until:
+                    flash(f'You are banned until {until:%b %d, %Y %H:%M}', 'danger')
+                else:
+                    flash('You are banned permanently', 'danger')
+                return render_template('login.html')
             # Backfill IP for accounts registered before IP tracking existed
             if not u['ip_address']:
                 ip = request.remote_addr or 'unknown'
@@ -1037,12 +1106,68 @@ def admin_users():
     return jsonify({
         'items': [{'id': r['id'], 'name': r['name'], 'username': r['username'],
                    'is_admin': bool(r['is_admin']), 'created_at': r['created_at'],
-                   'ip_address': r['ip_address'] or ''} for r in rows],
+                   'ip_address': r['ip_address'] or '',
+                   'banned': _ban_state(r['banned_until'])[0],
+                   'banned_until': r['banned_until'] or ''} for r in rows],
         'total': total,
         'page': page,
         'per_page': per_page,
         'pages': (total + per_page - 1) // per_page
     })
+
+
+@app.route('/admin/users/<int:user_id>/ban', methods=['POST'])
+@login_required
+def ban_user(user_id):
+    """Ban a user for N minutes (0 = permanent). Also bans their IP."""
+    if not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json() or {}
+    duration_minutes = data.get('duration_minutes', 60)
+    if not isinstance(duration_minutes, int) or duration_minutes < 0:
+        return jsonify({'error': 'Invalid duration'}), 400
+    conn = get_db()
+    u = conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+    if not u:
+        conn.close()
+        return jsonify({'error': 'Not found'}), 404
+    if u['is_admin']:
+        conn.close()
+        return jsonify({'error': 'Cannot ban admin accounts'}), 403
+    if duration_minutes == 0:
+        banned_until = 'permanent'
+    else:
+        now_ph = datetime.utcnow() + timedelta(hours=8)
+        banned_until = (now_ph + timedelta(minutes=duration_minutes)).strftime('%Y-%m-%d %H:%M:%S')
+    conn.execute("UPDATE users SET banned_until=? WHERE id=?", (banned_until, user_id))
+    # Ban the IP too, so they can't just re-register
+    if u['ip_address']:
+        conn.execute(
+            "INSERT OR REPLACE INTO banned_ips (ip, banned_until, username) VALUES (?,?,?)",
+            (u['ip_address'], banned_until, u['username'])
+        )
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True, 'banned_until': banned_until})
+
+
+@app.route('/admin/users/<int:user_id>/unban', methods=['POST'])
+@login_required
+def unban_user(user_id):
+    """Unban a user and remove their IP from the ban list."""
+    if not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized'}), 403
+    conn = get_db()
+    u = conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+    if not u:
+        conn.close()
+        return jsonify({'error': 'Not found'}), 404
+    conn.execute("UPDATE users SET banned_until='' WHERE id=?", (user_id,))
+    if u['ip_address']:
+        conn.execute("DELETE FROM banned_ips WHERE ip=?", (u['ip_address'],))
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True})
 
 @app.route('/admin/history')
 @login_required

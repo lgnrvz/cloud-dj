@@ -380,6 +380,7 @@
     loadHistory(1);
 
     // Load paginated users
+    let userCache = [];
     function loadUsers(page) {
         curUsersPage = page;
         fetch('/admin/users?page=' + page)
@@ -396,18 +397,76 @@
                     list.innerHTML = '<div style="padding:16px;text-align:center;color:#333;font-size:0.75rem;">No users</div>';
                     return;
                 }
-                list.innerHTML = d.items.map(u =>
+                userCache = d.items;
+                list.innerHTML = d.items.map((u, idx) =>
                     '<div class="user-item">'
                     + '<span class="name">' + escapeHtml(u.name) + '</span>'
                     + (u.is_admin ? '<span class="badge-admin">Admin</span>' : '')
+                    + (u.banned ? '<span class="badge-admin" style="background:#ff444422;color:#ff4444;border-color:#ff444444;">Banned</span>' : '')
                     + '<div class="joined">@' + escapeHtml(u.username) + ' &middot; ' + (u.created_at || '').substring(0,10) + '</div>'
                     + '<div class="joined" style="font-size:0.6rem;color:#444;">' + escapeHtml(u.ip_address || 'no IP') + '</div>'
+                    + (u.is_admin ? '' : '<button class="del-btn" style="font-size:0.75rem;color:#888;" onclick="openUserModal(' + idx + ')" title="User actions">&#9881;</button>')
                     + (u.is_admin ? '' : '<button class="del-btn" onclick="deleteUser(' + u.id + ',\'' + escapeHtml(u.username) + '\')" title="Delete user">&#x2715;</button>')
                     + '</div>'
                 ).join('');
             }).catch(() => {});
     }
     loadUsers(1);
+
+    // ─── User actions modal (ban / unban) ───
+    function openUserModal(idx) {
+        const u = userCache[idx];
+        if (!u) return;
+        document.getElementById('umName').textContent = u.name;
+        document.getElementById('umName').dataset.idx = idx;
+        document.getElementById('umUsername').textContent = '@' + u.username;
+        document.getElementById('umIp').textContent = 'IP: ' + (u.ip_address || 'no IP');
+        const st = document.getElementById('umBanStatus');
+        if (u.banned) {
+            st.textContent = u.banned_until === 'permanent' ? 'Banned permanently' : 'Banned until ' + u.banned_until;
+            st.style.color = '#ff4444';
+        } else {
+            st.textContent = 'Not banned';
+            st.style.color = '#1db954';
+        }
+        document.getElementById('umMsg').style.display = 'none';
+        document.getElementById('userModal').style.display = 'flex';
+    }
+    function closeUserModal() {
+        document.getElementById('userModal').style.display = 'none';
+    }
+    function banUser() {
+        const u = userCache[document.getElementById('umName').dataset.idx];
+        const dur = parseInt(document.getElementById('umDuration').value, 10);
+        const msg = document.getElementById('umMsg');
+        fetch('/admin/users/' + u.id + '/ban', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({duration_minutes: dur})
+        }).then(r => r.json()).then(d => {
+            if (d.success) {
+                closeUserModal();
+                loadUsers(curUsersPage);
+            } else {
+                msg.textContent = d.error || 'Ban failed';
+                msg.style.display = '';
+            }
+        }).catch(() => { msg.textContent = 'Server error'; msg.style.display = ''; });
+    }
+    function unbanUser() {
+        const u = userCache[document.getElementById('umName').dataset.idx];
+        const msg = document.getElementById('umMsg');
+        fetch('/admin/users/' + u.id + '/unban', { method: 'POST' })
+            .then(r => r.json()).then(d => {
+                if (d.success) {
+                    closeUserModal();
+                    loadUsers(curUsersPage);
+                } else {
+                    msg.textContent = d.error || 'Unban failed';
+                    msg.style.display = '';
+                }
+            }).catch(() => { msg.textContent = 'Server error'; msg.style.display = ''; });
+    }
 
     // Load scoring setting
     fetch('/admin/settings').then(r=>r.json()).then(d => {
@@ -561,6 +620,31 @@
         });
     }
     </script>
+
+    <!-- User Actions Modal -->
+    <div id="userModal" onclick="if(event.target===this)closeUserModal()" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.65);z-index:1000;align-items:center;justify-content:center;">
+        <div style="background:#0d0d16;border:1px solid #2a2a3a;border-radius:10px;max-width:340px;width:90%;padding:20px;">
+            <h3 id="umName" style="color:#fff;font-size:1rem;margin-bottom:2px;"></h3>
+            <div id="umUsername" style="color:#888;font-size:0.75rem;margin-bottom:8px;"></div>
+            <div id="umIp" style="color:#555;font-size:0.7rem;margin-bottom:8px;"></div>
+            <div id="umBanStatus" style="font-size:0.75rem;margin-bottom:14px;"></div>
+            <div style="font-size:0.7rem;color:#666;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;">Ban duration</div>
+            <select id="umDuration" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid #2a2a3a;background:#1a1a2a;color:#e0e0e8;font-family:inherit;font-size:0.8rem;margin-bottom:14px;">
+                <option value="10">10 minutes</option>
+                <option value="60" selected>1 hour</option>
+                <option value="360">6 hours</option>
+                <option value="1440">24 hours</option>
+                <option value="10080">7 days</option>
+                <option value="0">Permanent</option>
+            </select>
+            <div id="umMsg" style="font-size:0.75rem;color:#ff4444;margin-bottom:8px;display:none;"></div>
+            <div style="display:flex;gap:8px;">
+                <button onclick="banUser()" style="flex:1;padding:9px;border-radius:6px;border:none;background:#ff4444;color:#fff;font-weight:700;cursor:pointer;font-family:inherit;font-size:0.8rem;">Ban</button>
+                <button onclick="unbanUser()" style="flex:1;padding:9px;border-radius:6px;border:none;background:#1db954;color:#000;font-weight:700;cursor:pointer;font-family:inherit;font-size:0.8rem;">Unban</button>
+                <button onclick="closeUserModal()" style="padding:9px 14px;border-radius:6px;border:1px solid #2a2a3a;background:none;color:#888;cursor:pointer;font-family:inherit;font-size:0.8rem;">Close</button>
+            </div>
+        </div>
+    </div>
 
     <div class="footer">
         Cloud-DJ <span class="sep">|</span> v1.0 <span class="sep">|</span> <a href="https://github.com/lgnrvz/cloud-dj" target="_blank" rel="noopener noreferrer">GitHub</a>
