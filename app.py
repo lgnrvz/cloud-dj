@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, Response, stream_with_context, session
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, Response, stream_with_context, session, send_file
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_socketio import SocketIO, emit, join_room
 import sqlite3, os, threading, subprocess, re, signal, random, time, sys, hashlib, secrets, socket
@@ -1567,6 +1567,16 @@ def reorder():
     conn.commit()
     conn.close()
     return jsonify({'success': True})
+
+@app.route('/downloads/<path:filename>')
+def downloads(filename):
+    """Public file download (e.g. export files)."""
+    base = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'backups')
+    safe = os.path.basename(filename)
+    fp = os.path.join(base, safe)
+    if not os.path.isfile(fp):
+        return 'File not found', 404
+    return send_file(fp, as_attachment=False, mimetype='text/plain')
 
 @app.route('/admin/export-csv')
 @login_required
