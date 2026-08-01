@@ -69,12 +69,17 @@ jobs:
               -Body @{username='admin';password='djadmin123'} `
               -WebSession $s -UseBasicParsing -TimeoutSec 10 | Out-Null
 
-            # Add a real YouTube video (duration check exercises yt-dlp + node)
+            # Add a real YouTube video (duration check exercises yt-dlp + node).
+            # /add 302-redirects to /queue on success - follow it.
             $add = Invoke-WebRequest -Uri "$base/add" -Method Post `
               -Body @{url='https://www.youtube.com/watch?v=dQw4w9WgXcQ'} `
               -WebSession $s -UseBasicParsing -TimeoutSec 60 `
-              -MaximumRedirection 0 -ErrorAction SilentlyContinue
-            Write-Host "ADD STATUS: $($add.StatusCode)"
+              -ErrorAction SilentlyContinue
+
+            # Confirm the row actually landed in the DB
+            $rowcount = python -c "import sqlite3; print(sqlite3.connect('database.db').execute('select count(*) from queue').fetchone()[0])"
+            Write-Host "DB QUEUE ROWS: $rowcount"
+            if ([int]$rowcount -lt 1) { Write-Host "ADD FAIL - no queue row"; exit 1 }
 
             # Read the first chunk of the stream - proves yt-dlp actually delivers audio
             $cookies = ($s.Cookies.GetCookies($base) | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join "; "
@@ -86,9 +91,12 @@ jobs:
             $buf = New-Object byte[] 8192
             $n = 0
             try { $n = $stream.ReadAsync($buf, 0, $buf.Length).Wait(25000) } catch { $n = 0 }
+            $ct = $resp.Content.Headers.ContentType.ToString()
             $stream.Dispose(); $client.Dispose()
-            Write-Host "STREAM BYTES: $n"
-            if ($n -le 0) { Write-Host "STREAM FAIL - no audio data"; exit 1 }
+            Write-Host "STREAM HTTP: $($resp.StatusCode) | TYPE: $ct | BYTES: $n"
+            if ($resp.StatusCode -ne 200 -or $ct -notlike "audio/*" -or $n -le 0) {
+              Write-Host "STREAM FAIL - no audio data"; exit 1
+            }
             Write-Host "STREAM OK - audio flowing"
           } catch {
             Write-Host "SMOKE FAIL: $_"
