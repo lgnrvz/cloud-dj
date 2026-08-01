@@ -76,6 +76,10 @@ jobs:
               -WebSession $s -UseBasicParsing -TimeoutSec 60 `
               -ErrorAction SilentlyContinue
 
+            # Probe yt-dlp directly to surface WHY extraction may have failed
+            $probe = & yt-dlp --print duration -s "https://www.youtube.com/watch?v=dQw4w9WgXcQ" 2>&1 | Out-String
+            Write-Host "YTDLP PROBE: $($probe.Trim().Substring(0, [Math]::Min(200, $probe.Trim().Length)))"
+
             # Confirm the row actually landed - the app's own API reports queue count
             $np = Invoke-RestMethod -Uri "$base/now-playing" -WebSession $s -TimeoutSec 10
             Write-Host "QUEUE COUNT: $($np.queue_count)"
