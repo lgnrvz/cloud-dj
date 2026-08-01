@@ -101,7 +101,7 @@ jobs:
             $req = [System.Net.Http.HttpRequestMessage]::new([System.Net.Http.HttpMethod]::Get, "$base/stream/$streamId")
             $req.Headers.Add("Cookie", $cookies)
             $resp = $client.SendAsync($req, [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).Result
-            $stream = $resp.ReadAsStreamAsync().Result
+            $stream = $resp.Content.ReadAsStreamAsync().Result
             $buf = New-Object byte[] 8192
             $n = 0
             try { $n = $stream.ReadAsync($buf, 0, $buf.Length).Wait(25000) } catch { $n = 0 }
