@@ -88,15 +88,17 @@ jobs:
             $probe = & .\yt-dlp.exe --js-runtimes node:node.exe --print duration -s "https://www.youtube.com/watch?v=dQw4w9WgXcQ" 2>&1 | Out-String
             Write-Host "YTDLP PROBE: $($probe.Trim().Substring(0, [Math]::Min(200, $probe.Trim().Length)))"
 
-            # Confirm the row actually landed - the app's own API reports queue count
+            # Confirm the row actually landed - the song auto-starts, so the
+            # now-playing id is the proof (queue_count only counts pending items)
             $np = Invoke-RestMethod -Uri "$base/now-playing" -WebSession $s -TimeoutSec 10
-            Write-Host "QUEUE COUNT: $($np.queue_count)"
-            if ($np.queue_count -lt 1) { Write-Host "ADD FAIL - no queue row"; exit 1 }
+            Write-Host "NOW PLAYING: id=$($np.id) title=$($np.title)"
+            if ($np.id -lt 1) { Write-Host "ADD FAIL - nothing playing"; exit 1 }
+            $streamId = $np.id
 
             # Read the first chunk of the stream - proves yt-dlp actually delivers audio
             $cookies = ($s.Cookies.GetCookies($base) | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join "; "
             $client = [System.Net.Http.HttpClient]::new()
-            $req = [System.Net.Http.HttpRequestMessage]::new([System.Net.Http.HttpMethod]::Get, "$base/stream/1")
+            $req = [System.Net.Http.HttpRequestMessage]::new([System.Net.Http.HttpMethod]::Get, "$base/stream/$streamId")
             $req.Headers.Add("Cookie", $cookies)
             $resp = $client.SendAsync($req, [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).Result
             $stream = $resp.ReadAsStreamAsync().Result
