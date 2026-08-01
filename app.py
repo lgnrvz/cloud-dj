@@ -777,7 +777,9 @@ def add():
 
     # Duration check
     try:
-        result = run_ytdl(['--print', 'duration', '-s', clean_url], timeout=30)
+        # 90s: cold start inside the bundled exe (onefile extract + JS challenge)
+        # can exceed 30s on the first song
+        result = run_ytdl(['--print', 'duration', '-s', clean_url], timeout=90)
         dur = result.stdout.strip()
         if not dur:
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
