@@ -76,10 +76,10 @@ jobs:
               -WebSession $s -UseBasicParsing -TimeoutSec 60 `
               -ErrorAction SilentlyContinue
 
-            # Confirm the row actually landed in the DB
-            $rowcount = python -c "import sqlite3; print(sqlite3.connect('database.db').execute('select count(*) from queue').fetchone()[0])"
-            Write-Host "DB QUEUE ROWS: $rowcount"
-            if ([int]$rowcount -lt 1) { Write-Host "ADD FAIL - no queue row"; exit 1 }
+            # Confirm the row actually landed - the app's own API reports queue count
+            $np = Invoke-RestMethod -Uri "$base/now-playing" -WebSession $s -TimeoutSec 10
+            Write-Host "QUEUE COUNT: $($np.queue_count)"
+            if ($np.queue_count -lt 1) { Write-Host "ADD FAIL - no queue row"; exit 1 }
 
             # Read the first chunk of the stream - proves yt-dlp actually delivers audio
             $cookies = ($s.Cookies.GetCookies($base) | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join "; "
