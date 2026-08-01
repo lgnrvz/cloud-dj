@@ -61,7 +61,8 @@ jobs:
 
       - name: Smoke test (boot exe, add song, verify stream)
         run: |
-          $p = Start-Process -FilePath "dist\cloud-dj.exe" -PassThru
+          $p = Start-Process -FilePath "dist\cloud-dj.exe" -PassThru `
+            -RedirectStandardOutput exe.log -RedirectStandardError exe.err
           Start-Sleep -Seconds 15
           $base = "http://localhost:5050"
           try {
@@ -75,12 +76,12 @@ jobs:
               -Body @{username='admin';password='djadmin123'} `
               -WebSession $s -UseBasicParsing -TimeoutSec 10 | Out-Null
 
-            # Add a real YouTube video (duration check exercises yt-dlp + node).
-            # /add 302-redirects to /queue on success - follow it.
+            # Add a real YouTube video. XHR header makes the app return JSON errors.
             $add = Invoke-WebRequest -Uri "$base/add" -Method Post `
+              -Headers @{'X-Requested-With'='XMLHttpRequest'} `
               -Body @{url='https://www.youtube.com/watch?v=dQw4w9WgXcQ'} `
-              -WebSession $s -UseBasicParsing -TimeoutSec 120 `
-              -ErrorAction SilentlyContinue
+              -WebSession $s -UseBasicParsing -TimeoutSec 120 -SkipHttpErrorCheck
+            Write-Host "ADD RESPONSE: $($add.StatusCode) $($add.Content)"
 
             # Probe the SAME standalone yt-dlp + node that the exe bundles,
             # to surface WHY extraction may have failed
