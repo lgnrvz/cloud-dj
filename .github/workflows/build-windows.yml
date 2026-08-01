@@ -38,12 +38,18 @@ jobs:
           $nd = Get-ChildItem node -Directory | Select-Object -First 1
           Copy-Item "$($nd.FullName)\node.exe" .
 
+      - name: Download standalone yt-dlp (self-contained exe, not the pip launcher stub)
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/yt-dlp/yt-dlp/releases/download/2026.07.04/yt-dlp.exe" -OutFile yt-dlp.exe
+          $size = (Get-Item yt-dlp.exe).Length
+          Write-Host "yt-dlp.exe size: $([math]::Round($size / 1MB, 1)) MB"
+          if ($size -lt 5MB) { Write-Host "yt-dlp.exe too small - download failed"; exit 1 }
+
       - name: Build single-file exe with PyInstaller
         run: |
-          $yt = (Get-Command yt-dlp).Source
           pyinstaller --onefile --name cloud-dj --console `
             --version-file "packaging\version_info.txt" `
-            --add-binary "$yt;." `
+            --add-binary "yt-dlp.exe;." `
             --add-binary "ffmpeg.exe;." `
             --add-binary "ffprobe.exe;." `
             --add-binary "node.exe;." `
@@ -76,8 +82,9 @@ jobs:
               -WebSession $s -UseBasicParsing -TimeoutSec 60 `
               -ErrorAction SilentlyContinue
 
-            # Probe yt-dlp directly to surface WHY extraction may have failed
-            $probe = & yt-dlp --print duration -s "https://www.youtube.com/watch?v=dQw4w9WgXcQ" 2>&1 | Out-String
+            # Probe the SAME standalone yt-dlp + node that the exe bundles,
+            # to surface WHY extraction may have failed
+            $probe = & .\yt-dlp.exe --js-runtimes node:node.exe --print duration -s "https://www.youtube.com/watch?v=dQw4w9WgXcQ" 2>&1 | Out-String
             Write-Host "YTDLP PROBE: $($probe.Trim().Substring(0, [Math]::Min(200, $probe.Trim().Length)))"
 
             # Confirm the row actually landed - the app's own API reports queue count
