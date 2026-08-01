@@ -31,6 +31,13 @@ jobs:
           Copy-Item "$($ff.FullName)\bin\ffmpeg.exe" .
           Copy-Item "$($ff.FullName)\bin\ffprobe.exe" .
 
+      - name: Download Node.js runtime (needed by yt-dlp for JS challenges)
+        run: |
+          Invoke-WebRequest -Uri "https://nodejs.org/dist/v22.12.0/node-v22.12.0-win-x64.zip" -OutFile node.zip
+          Expand-Archive node.zip -DestinationPath node
+          $nd = Get-ChildItem node -Directory | Select-Object -First 1
+          Copy-Item "$($nd.FullName)\node.exe" .
+
       - name: Build single-file exe with PyInstaller
         run: |
           $yt = (Get-Command yt-dlp).Source
@@ -39,20 +46,50 @@ jobs:
             --add-binary "$yt;." `
             --add-binary "ffmpeg.exe;." `
             --add-binary "ffprobe.exe;." `
+            --add-binary "node.exe;." `
             --add-data "templates;templates" `
             --add-data "static;static" `
             --hidden-import "engineio.async_drivers.threading" `
             --hidden-import "simple_websocket" `
             app.py
 
-      - name: Smoke test (boot exe, hit HTTP)
+      - name: Smoke test (boot exe, add song, verify stream)
         run: |
           $p = Start-Process -FilePath "dist\cloud-dj.exe" -PassThru
           Start-Sleep -Seconds 15
+          $base = "http://localhost:5050"
           try {
-            $r = Invoke-WebRequest -Uri "http://localhost:5050" -TimeoutSec 8 -UseBasicParsing
+            $r = Invoke-WebRequest -Uri $base -TimeoutSec 8 -UseBasicParsing
             Write-Host "SMOKE OK: HTTP $($r.StatusCode)"
             if ($r.StatusCode -ne 200 -and $r.StatusCode -ne 302) { exit 1 }
+
+            # Log in as admin (fresh DB seeds admin/djadmin123)
+            $s = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+            Invoke-WebRequest -Uri "$base/login" -Method Post `
+              -Body @{username='admin';password='djadmin123'} `
+              -WebSession $s -UseBasicParsing -TimeoutSec 10 | Out-Null
+
+            # Add a real YouTube video (duration check exercises yt-dlp + node)
+            $add = Invoke-WebRequest -Uri "$base/add" -Method Post `
+              -Body @{url='https://www.youtube.com/watch?v=dQw4w9WgXcQ'} `
+              -WebSession $s -UseBasicParsing -TimeoutSec 60 `
+              -MaximumRedirection 0 -ErrorAction SilentlyContinue
+            Write-Host "ADD STATUS: $($add.StatusCode)"
+
+            # Read the first chunk of the stream - proves yt-dlp actually delivers audio
+            $cookies = ($s.Cookies.GetCookies($base) | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join "; "
+            $client = [System.Net.Http.HttpClient]::new()
+            $req = [System.Net.Http.HttpRequestMessage]::new([System.Net.Http.HttpMethod]::Get, "$base/stream/1")
+            $req.Headers.Add("Cookie", $cookies)
+            $resp = $client.SendAsync($req, [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).Result
+            $stream = $resp.ReadAsStreamAsync().Result
+            $buf = New-Object byte[] 8192
+            $n = 0
+            try { $n = $stream.ReadAsync($buf, 0, $buf.Length).Wait(25000) } catch { $n = 0 }
+            $stream.Dispose(); $client.Dispose()
+            Write-Host "STREAM BYTES: $n"
+            if ($n -le 0) { Write-Host "STREAM FAIL - no audio data"; exit 1 }
+            Write-Host "STREAM OK - audio flowing"
           } catch {
             Write-Host "SMOKE FAIL: $_"
             exit 1

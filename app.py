@@ -201,8 +201,14 @@ SIGNUP_COOLDOWN_SECONDS = 0  # No cooldown for LAN use
 # Auto-detect paths — works on Linux AND Windows
 import shutil
 
-# Node.js: check PATH first, then common install locations
-NODE_PATH = shutil.which('node') or shutil.which('nodejs')
+# Node.js: check bundled location first (PyInstaller onefile), then PATH, then common install locations
+NODE_PATH = None
+if getattr(sys, 'frozen', False):
+    _bundled_node = os.path.join(sys._MEIPASS, 'node.exe')
+    if os.path.isfile(_bundled_node):
+        NODE_PATH = _bundled_node
+if not NODE_PATH:
+    NODE_PATH = shutil.which('node') or shutil.which('nodejs')
 if not NODE_PATH:
     for candidate in [
         '/usr/bin/node',
