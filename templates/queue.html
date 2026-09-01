@@ -663,7 +663,9 @@
             if (onError) hlsPlayer.on(Hls.Events.ERROR, function(evt, data) {
                 if (data && data.fatal && onError) onError(data);
             });
-            hlsPlayer.loadSource(d.video_url);
+            // Route through the server proxy — googlevideo has no CORS headers,
+            // so hls.js (XHR-based) can't fetch it directly in Chrome/Firefox
+            hlsPlayer.loadSource('/proxy-video?url=' + encodeURIComponent(d.video_url));
             hlsPlayer.attachMedia(video);
         } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
             // Safari native HLS

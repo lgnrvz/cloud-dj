@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_socketio import SocketIO, emit, join_room
 import sqlite3, os, threading, subprocess, re, signal, random, time, sys, hashlib, secrets, socket
+import urllib.request, urllib.parse
 from base64 import b64encode
 from datetime import datetime, timedelta
 
@@ -1057,6 +1058,69 @@ def direct_video():
 
 @app.route('/replay/<int:item_id>', methods=['POST'])
 @login_required
+@app.route('/proxy-video')
+@login_required
+def proxy_video():
+    """Proxy a YouTube HLS manifest (m3u8) through this server to bypass CORS."""
+    url = request.args.get('url', '')
+    if not url.startswith('https://'):
+        return jsonify({'error': 'Invalid URL'}), 400
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            manifest = resp.read().decode('utf-8', errors='replace')
+    except Exception as e:
+        return jsonify({'error': 'Manifest fetch failed: %s' % e}), 502
+
+    # Rewrite absolute URLs inside URI="..." attributes (e.g. #EXT-X-MAP)
+    manifest = re.sub(r'URI="(https?://[^"]+)"',
+                      lambda m: 'URI="/proxy-seg?url=' + urllib.parse.quote(m.group(1), safe='') + '"',
+                      manifest)
+    # Rewrite bare absolute-URL lines (segment entries)
+    manifest = re.sub(r'^(https?://\S+)$',
+                      lambda m: '/proxy-seg?url=' + urllib.parse.quote(m.group(1), safe=''),
+                      manifest, flags=re.MULTILINE)
+
+    resp = Response(manifest, content_type='application/vnd.apple.mpegurl')
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    resp.headers['Cache-Control'] = 'no-store'
+    return resp
+
+
+@app.route('/proxy-seg')
+@login_required
+def proxy_seg():
+    """Stream a proxied HLS segment/init section (server-side fetch, CORS-free)."""
+    url = request.args.get('url', '')
+    if not url.startswith('https://'):
+        return jsonify({'error': 'Invalid URL'}), 400
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    rng = request.headers.get('Range')
+    if rng:
+        headers['Range'] = rng
+    try:
+        req = urllib.request.Request(url, headers=headers)
+        upstream = urllib.request.urlopen(req, timeout=30)
+
+        def generate():
+            while True:
+                chunk = upstream.read(65536)
+                if not chunk:
+                    break
+                yield chunk
+
+        resp = Response(stream_with_context(generate()),
+                        content_type=upstream.headers.get('Content-Type', 'application/octet-stream'))
+        if rng and upstream.headers.get('Content-Range'):
+            resp.headers['Content-Range'] = upstream.headers['Content-Range']
+        if upstream.headers.get('Content-Length'):
+            resp.headers['Content-Length'] = upstream.headers['Content-Length']
+        resp.headers['Access-Control-Allow-Origin'] = '*'
+        resp.headers['Cache-Control'] = 'no-store'
+        return resp
+    except Exception as e:
+        return jsonify({'error': 'Segment fetch failed: %s' % e}), 502
+
 def replay_from_history(item_id):
     """Re-queue a previously played song from history."""
     conn = get_db()
