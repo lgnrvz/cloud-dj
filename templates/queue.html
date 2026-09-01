@@ -422,6 +422,7 @@
         }
         #reactPicker button:hover { background: #1a1a2a; transform: scale(1.15); }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js"></script>
 </head>
 <body>
     <nav class="navbar">
@@ -650,6 +651,28 @@
     let isAdmin = {% if current_user.is_admin %}true{% else %}false{% endif %};
 
     {% if current_user.is_admin %}
+    let hlsPlayer = null;
+    function isHlsSource(d) {
+        return d && (d.mime_type === 'application/x-mpegURL' || (d.video_url || '').includes('.m3u8'));
+    }
+    function setupHls(video, d, onReady, onError) {
+        if (hlsPlayer) { try { hlsPlayer.destroy(); } catch(e) {} hlsPlayer = null; }
+        if (window.Hls && Hls.isSupported()) {
+            hlsPlayer = new Hls();
+            if (onReady) hlsPlayer.on(Hls.Events.MANIFEST_PARSED, onReady);
+            if (onError) hlsPlayer.on(Hls.Events.ERROR, function(evt, data) {
+                if (data && data.fatal && onError) onError(data);
+            });
+            hlsPlayer.loadSource(d.video_url);
+            hlsPlayer.attachMedia(video);
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            // Safari native HLS
+            video.type = 'application/vnd.apple.mpegurl';
+            video.src = d.video_url;
+            if (onReady) video.oncanplay = onReady;
+        }
+    }
+
     const video = document.getElementById('html5Player');
     const videoContainer = document.getElementById('videoContainer');
     const videoLoading = document.getElementById('videoLoading');
@@ -735,7 +758,17 @@
                 });
 
                 // Set src — browser auto-loads, no need for video.load()
-                video.src = d.video_url;
+                if (isHlsSource(d)) {
+                    // HLS (m3u8) needs hls.js on Chrome/Firefox — native <video> can't play it
+                    await new Promise((resolve, reject) => {
+                        setupHls(video, d, resolve, reject);
+                        // Fallback: resolve after 8s even if manifest hasn't fired
+                        setTimeout(resolve, 8000);
+                    });
+                } else {
+                    video.type = d.mime_type || 'video/mp4';
+                    video.src = d.video_url;
+                }
 
                 try {
                     await playReady;
@@ -971,8 +1004,16 @@
                         const vr = await fetch('/direct-video?url=' + encodeURIComponent(np.url));
                         const vd = await vr.json();
                         if (vd.video_url) {
-                            video.type = vd.mime_type || 'video/mp4';
-                            video.src = vd.video_url;
+                            if (isHlsSource(vd)) {
+                                // HLS needs hls.js on Chrome/Firefox
+                                await new Promise((resolve, reject) => {
+                                    setupHls(video, vd, resolve, reject);
+                                    setTimeout(resolve, 8000);
+                                });
+                            } else {
+                                video.type = vd.mime_type || 'video/mp4';
+                                video.src = vd.video_url;
+                            }
                             try { await video.play(); setStatus('#1db954', 'Playing'); return; }
                             catch(e) { setStatus('#ffd700', 'Click play'); return; }
                         }
