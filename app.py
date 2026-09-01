@@ -1056,8 +1056,6 @@ def direct_video():
 
     return jsonify({'error': f'Failed to get video URL: {last_error}'}), 500
 
-@app.route('/replay/<int:item_id>', methods=['POST'])
-@login_required
 @app.route('/proxy-video')
 @login_required
 def proxy_video():
@@ -1121,6 +1119,9 @@ def proxy_seg():
     except Exception as e:
         return jsonify({'error': 'Segment fetch failed: %s' % e}), 502
 
+
+@app.route('/replay/<int:item_id>', methods=['POST'])
+@login_required
 def replay_from_history(item_id):
     """Re-queue a previously played song from history."""
     conn = get_db()
