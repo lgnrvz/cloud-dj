@@ -1019,42 +1019,140 @@ def search_history():
         'items': [{'id': r['id'], 'title': r['title']} for r in rows]
     })
 
+def _ytdlp_base():
+    cmd = [YTDLP]
+    if NODE_PATH and NODE_PATH != 'node':
+        cmd += ['--js-runtimes', f'node:{NODE_PATH}']
+    return cmd
+
+
+def _resolve_streams(clean_url):
+    """Resolve (video_url, audio_url) for a YouTube video.
+
+    YouTube now serves DASH-only for most clients: there is no progressive
+    muxed format (18/22) anymore, so a bare video URL plays with NO sound.
+    Returns (video_url, audio_url) where audio_url may be None if a muxed
+    stream was found instead.
+    """
+    fmt = ('bv*[ext=mp4][vcodec^=avc1][height<=720]+ba[ext=m4a]/'
+           'bv*[ext=mp4][vcodec^=avc1]+ba[ext=m4a]/'
+           'bv*[ext=mp4]+ba[ext=m4a]/bv*+ba')
+    try:
+        result = subprocess.run(
+            _ytdlp_base() + ['-g', '-f', fmt, clean_url],
+            capture_output=True, text=True, timeout=60
+        )
+    except subprocess.TimeoutExpired:
+        return None
+    lines = [l.strip() for l in result.stdout.strip().split('\n') if l.strip()]
+    if len(lines) >= 2:
+        return lines[0], lines[1]
+    if len(lines) == 1:
+        return lines[0], None
+    return None
+
+
+@app.route('/muxed-video')
+@login_required
+def muxed_video():
+    """Remux YouTube video + audio into one fragmented MP4 and stream it.
+
+    The browser <video> element needs a single URL carrying BOTH tracks;
+    piping yt-dlp's separate DASH streams through ffmpeg provides that.
+    """
+    url = request.args.get('url', '')
+    m = re.search(r'(?:v=|/)([\w-]{11})(?:\?|&|$)', url)
+    if not m:
+        return "Invalid URL", 400
+    clean = 'https://www.youtube.com/watch?v=' + m.group(1)
+
+    streams = _resolve_streams(clean)
+    if not streams:
+        return "Stream unavailable", 502
+    vurl, aurl = streams
+
+    ffmpeg = shutil.which('ffmpeg') or 'ffmpeg'
+    cmd = [ffmpeg, '-loglevel', 'error', '-i', vurl]
+    if aurl:
+        cmd += ['-i', aurl]
+        vl, al = vurl.lower(), aurl.lower()
+        if '%2fmp4' in vl or 'mime=video/mp4' in vl:
+            if '%2fmp4' in al or 'mime=audio/mp4' in al:
+                cmd += ['-map', '0:v:0', '-map', '1:a:0', '-c', 'copy']
+            else:
+                cmd += ['-map', '0:v:0', '-map', '1:a:0',
+                        '-c:v', 'copy', '-c:a', 'aac', '-b:a', '160k']
+        else:
+            cmd += ['-map', '0:v:0', '-map', '1:a:0',
+                    '-c:v', 'copy', '-c:a', 'aac', '-b:a', '160k']
+    else:
+        cmd += ['-map', '0:v:0', '-map', '0:a:0?', '-c', 'copy']
+    cmd += ['-movflags', 'frag_keyframe+empty_moov+default_base_moof',
+            '-f', 'mp4', 'pipe:1']
+
+    def generate():
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                                stderr=subprocess.DEVNULL)
+        try:
+            while True:
+                data = proc.stdout.read(32768)
+                if not data:
+                    break
+                yield data
+        finally:
+            try:
+                proc.kill()
+                proc.wait(timeout=5)
+            except Exception:
+                pass
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype='video/mp4',
+        headers={
+            'Content-Disposition': 'inline',
+            'Accept-Ranges': 'none',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+        }
+    )
+
+
 @app.route('/direct-video')
 def direct_video():
-    """Return a direct Google video URL for browser HTML5 <video> playback.
-    Tries multiple formats as fallback, returns a fresh URL each call."""
+    """Return a playable URL for the browser HTML5 <video> element.
+
+    Tries a progressive muxed format first (video+audio in one file). When
+    YouTube offers DASH only, returns the local /muxed-video endpoint so the
+    player gets sound instead of a silent video-only stream.
+    """
     url = request.args.get('url', '')
     m = re.search(r'(?:v=|/)([\w-]{11})(?:\?|&|$)', url)
     if not m:
         return jsonify({'error': 'Invalid URL'}), 400
     video_id = m.group(1)
+    clean = 'https://www.youtube.com/watch?v=' + video_id
 
-    # Try formats in order: 18 (360p MP4), 22 (720p MP4), bestvideo+bestaudio
-    formats = ['18', '22', 'bestvideo+bestaudio/best']
-    last_error = None
-
-    for fmt in formats:
+    # Progressive (muxed) formats are the only ones a <video> can play with
+    # sound on its own. A 2-line -g output means separate streams: no sound.
+    for fmt in ['18', '22']:
         try:
-            ytdl_cmd = [YTDLP]
-            if NODE_PATH and NODE_PATH != 'node':
-                ytdl_cmd += ['--js-runtimes', f'node:{NODE_PATH}']
-            ytdl_cmd += ['-g', '-f', fmt, url]
             result = subprocess.run(
-                ytdl_cmd,
+                _ytdlp_base() + ['-g', '-f', fmt, clean],
                 capture_output=True, text=True, timeout=30
             )
-            video_url = result.stdout.strip().split('\n')[0]
-            if video_url:
-                mime = 'video/mp4'
-                if 'm3u8' in video_url:
-                    mime = 'application/x-mpegURL'
-                return jsonify({'video_url': video_url, 'video_id': video_id, 'mime_type': mime})
+            lines = [l.strip() for l in result.stdout.strip().split('\n') if l.strip()]
+            if len(lines) == 1:
+                return jsonify({'video_url': lines[0], 'video_id': video_id,
+                                'mime_type': 'video/mp4'})
         except subprocess.TimeoutExpired:
-            last_error = 'Timeout'
-        except Exception as e:
-            last_error = str(e)
+            pass
 
-    return jsonify({'error': f'Failed to get video URL: {last_error}'}), 500
+    # No muxed format available -> let the server remux video+audio together.
+    return jsonify({
+        'video_url': '/muxed-video?url=' + urllib.parse.quote(clean, safe=''),
+        'video_id': video_id,
+        'mime_type': 'video/mp4'
+    })
 
 @app.route('/proxy-video')
 @login_required
