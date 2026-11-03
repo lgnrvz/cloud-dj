@@ -1026,130 +1026,108 @@ def _ytdlp_base():
     return cmd
 
 
-def _resolve_streams(clean_url):
-    """Resolve (video_url, audio_url) for a YouTube video.
+VIDEO_CACHE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'video_cache')
+_video_locks = {}
+_video_locks_guard = threading.Lock()
 
-    YouTube now serves DASH-only for most clients: there is no progressive
-    muxed format (18/22) anymore, so a bare video URL plays with NO sound.
-    Returns (video_url, audio_url) where audio_url may be None if a muxed
-    stream was found instead.
-    """
-    fmt = ('bv*[ext=mp4][vcodec^=avc1][height<=720]+ba[ext=m4a]/'
-           'bv*[ext=mp4][vcodec^=avc1]+ba[ext=m4a]/'
-           'bv*[ext=mp4]+ba[ext=m4a]/bv*+ba')
+
+def _video_lock(video_id):
+    with _video_locks_guard:
+        lock = _video_locks.get(video_id)
+        if lock is None:
+            lock = threading.Lock()
+            _video_locks[video_id] = lock
+        return lock
+
+
+def _cached_video_path(video_id):
+    return os.path.join(VIDEO_CACHE, video_id + '.mp4')
+
+
+def _prune_video_cache(keep=50):
+    """Keep the cache bounded — a party queue plays a lot of songs."""
     try:
-        result = subprocess.run(
-            _ytdlp_base() + ['-g', '-f', fmt, clean_url],
-            capture_output=True, text=True, timeout=60
-        )
-    except subprocess.TimeoutExpired:
+        files = [os.path.join(VIDEO_CACHE, f)
+                 for f in os.listdir(VIDEO_CACHE) if f.endswith('.mp4')]
+        files.sort(key=os.path.getmtime)
+        for path in files[:-keep]:
+            os.remove(path)
+    except Exception:
+        pass
+
+
+def _prepare_video(video_id):
+    """Download + merge one muxed MP4 for a YouTube video and return its path.
+
+    Downloading to a real file (instead of piping DASH streams to the browser)
+    gives the <video> element a normal seekable file with a real duration;
+    piping fragmented MP4 left Chrome showing a full buffer bar and a timer
+    that advanced with a frozen picture.
+    """
+    path = _cached_video_path(video_id)
+    if os.path.exists(path) and os.path.getsize(path) > 100_000:
+        return path
+    os.makedirs(VIDEO_CACHE, exist_ok=True)
+    with _video_lock(video_id):
+        if os.path.exists(path) and os.path.getsize(path) > 100_000:
+            return path
+        fmt = ('bv*[ext=mp4][vcodec^=avc1][height<=720]+ba[ext=m4a]/'
+               'bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b')
+        cmd = _ytdlp_base() + [
+            '-f', fmt, '--merge-output-format', 'mp4',
+            '--no-playlist', '--no-warnings', '--retries', '3',
+            '-o', path, 'https://www.youtube.com/watch?v=' + video_id
+        ]
+        try:
+            subprocess.run(cmd, capture_output=True, timeout=240)
+        except subprocess.TimeoutExpired:
+            return None
+        if os.path.exists(path) and os.path.getsize(path) > 100_000:
+            _prune_video_cache()
+            return path
+        try:
+            os.remove(path)
+        except OSError:
+            pass
         return None
-    lines = [l.strip() for l in result.stdout.strip().split('\n') if l.strip()]
-    if len(lines) >= 2:
-        return lines[0], lines[1]
-    if len(lines) == 1:
-        return lines[0], None
-    return None
 
 
 @app.route('/muxed-video')
 @login_required
 def muxed_video():
-    """Remux YouTube video + audio into one fragmented MP4 and stream it.
-
-    The browser <video> element needs a single URL carrying BOTH tracks;
-    piping yt-dlp's separate DASH streams through ffmpeg provides that.
-    """
+    """Serve the prepared MP4 for a YouTube video (range-capable, seekable)."""
     url = request.args.get('url', '')
     m = re.search(r'(?:v=|/)([\w-]{11})(?:\?|&|$)', url)
     if not m:
         return "Invalid URL", 400
-    clean = 'https://www.youtube.com/watch?v=' + m.group(1)
-
-    streams = _resolve_streams(clean)
-    if not streams:
+    path = _prepare_video(m.group(1))
+    if not path:
         return "Stream unavailable", 502
-    vurl, aurl = streams
-
-    ffmpeg = shutil.which('ffmpeg') or 'ffmpeg'
-    cmd = [ffmpeg, '-loglevel', 'error', '-i', vurl]
-    if aurl:
-        cmd += ['-i', aurl]
-        vl, al = vurl.lower(), aurl.lower()
-        if '%2fmp4' in vl or 'mime=video/mp4' in vl:
-            if '%2fmp4' in al or 'mime=audio/mp4' in al:
-                cmd += ['-map', '0:v:0', '-map', '1:a:0', '-c', 'copy']
-            else:
-                cmd += ['-map', '0:v:0', '-map', '1:a:0',
-                        '-c:v', 'copy', '-c:a', 'aac', '-b:a', '160k']
-        else:
-            cmd += ['-map', '0:v:0', '-map', '1:a:0',
-                    '-c:v', 'copy', '-c:a', 'aac', '-b:a', '160k']
-    else:
-        cmd += ['-map', '0:v:0', '-map', '0:a:0?', '-c', 'copy']
-    cmd += ['-movflags', 'frag_keyframe+empty_moov+default_base_moof',
-            '-f', 'mp4', 'pipe:1']
-
-    def generate():
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                                stderr=subprocess.DEVNULL)
-        try:
-            while True:
-                data = proc.stdout.read(32768)
-                if not data:
-                    break
-                yield data
-        finally:
-            try:
-                proc.kill()
-                proc.wait(timeout=5)
-            except Exception:
-                pass
-
-    return Response(
-        stream_with_context(generate()),
-        mimetype='video/mp4',
-        headers={
-            'Content-Disposition': 'inline',
-            'Accept-Ranges': 'none',
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-        }
-    )
+    resp = send_file(path, mimetype='video/mp4', conditional=True)
+    resp.headers['Cache-Control'] = 'no-cache'
+    return resp
 
 
 @app.route('/direct-video')
 def direct_video():
     """Return a playable URL for the browser HTML5 <video> element.
 
-    Tries a progressive muxed format first (video+audio in one file). When
-    YouTube offers DASH only, returns the local /muxed-video endpoint so the
-    player gets sound instead of a silent video-only stream.
+    YouTube serves DASH-only for most clients (no progressive muxed formats),
+    so the video is prepared locally and served as one seekable MP4 file —
+    the only shape that gives the player picture AND sound reliably.
     """
     url = request.args.get('url', '')
     m = re.search(r'(?:v=|/)([\w-]{11})(?:\?|&|$)', url)
     if not m:
         return jsonify({'error': 'Invalid URL'}), 400
     video_id = m.group(1)
-    clean = 'https://www.youtube.com/watch?v=' + video_id
 
-    # Progressive (muxed) formats are the only ones a <video> can play with
-    # sound on its own. A 2-line -g output means separate streams: no sound.
-    for fmt in ['18', '22']:
-        try:
-            result = subprocess.run(
-                _ytdlp_base() + ['-g', '-f', fmt, clean],
-                capture_output=True, text=True, timeout=30
-            )
-            lines = [l.strip() for l in result.stdout.strip().split('\n') if l.strip()]
-            if len(lines) == 1:
-                return jsonify({'video_url': lines[0], 'video_id': video_id,
-                                'mime_type': 'video/mp4'})
-        except subprocess.TimeoutExpired:
-            pass
-
-    # No muxed format available -> let the server remux video+audio together.
+    path = _prepare_video(video_id)
+    if not path:
+        return jsonify({'error': 'Failed to prepare video'}), 502
     return jsonify({
-        'video_url': '/muxed-video?url=' + urllib.parse.quote(clean, safe=''),
+        'video_url': '/muxed-video?url=' + urllib.parse.quote(
+            'https://www.youtube.com/watch?v=' + video_id, safe=''),
         'video_id': video_id,
         'mime_type': 'video/mp4'
     })
