@@ -398,6 +398,10 @@ def init_db():
         conn.execute("INSERT INTO queue_fts(queue_fts) VALUES('rebuild')")
     except Exception:
         pass  # Worst case — FTS disabled, app still runs
+    conn.execute("""CREATE TABLE IF NOT EXISTS app_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT
+    )""")
     admin = conn.execute("SELECT id FROM users WHERE username='admin'").fetchone()
     if not admin:
         conn.execute("INSERT INTO users (name, username, password, is_admin) VALUES (?, ?, ?, ?)",
@@ -406,6 +410,27 @@ def init_db():
     conn.close()
 
 init_db()
+
+
+def get_setting(key, default=None):
+    """Read a persisted app setting (survives restarts)."""
+    try:
+        conn = get_db()
+        row = conn.execute("SELECT value FROM app_settings WHERE key=?", (key,)).fetchone()
+        conn.close()
+        return row['value'] if row else default
+    except sqlite3.Error:
+        return default
+
+
+def set_setting(key, value):
+    conn = get_db()
+    conn.execute("INSERT INTO app_settings(key, value) VALUES(?, ?) "
+                 "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                 (key, str(value)))
+    conn.commit()
+    conn.close()
+
 
 def clean_yt_url(url):
     match = re.search(r'(https?://(?:www\.|m\.|music\.)?(?:youtube\.com/watch\?v=|youtu\.be/))([\w-]+)', url)
@@ -1038,6 +1063,16 @@ NORMALIZE_AUDIO = os.environ.get('CLOUDDJ_NORMALIZE', '1') != '0'
 TARGET_LUFS = float(os.environ.get('CLOUDDJ_TARGET_LUFS', '-14'))
 TARGET_TP = float(os.environ.get('CLOUDDJ_TARGET_TP', '-1.0'))
 MAX_GAIN_DB = float(os.environ.get('CLOUDDJ_MAX_GAIN_DB', '18'))
+LOUDNESS_TARGET_MIN, LOUDNESS_TARGET_MAX = -30.0, -6.0
+# Live target, adjustable from the admin dashboard and persisted in app_settings.
+LOUDNESS_TARGET = TARGET_LUFS
+try:
+    _saved = get_setting('loudness_target')
+    if _saved not in (None, ''):
+        LOUDNESS_TARGET = max(LOUDNESS_TARGET_MIN,
+                              min(LOUDNESS_TARGET_MAX, float(_saved)))
+except (TypeError, ValueError):
+    pass
 
 
 def _loudness_sidecar(video_id):
@@ -1073,16 +1108,17 @@ def _apply_loudness(path, video_id):
     """
     if not NORMALIZE_AUDIO:
         return None
+    target = LOUDNESS_TARGET
     sidecar = _loudness_sidecar(video_id)
     if os.path.exists(sidecar):
         # Already measured: skip unless the target level changed since then.
         try:
             with open(sidecar) as fh:
                 previous = json.load(fh)
-            if abs(float(previous.get('target_lufs', TARGET_LUFS)) - TARGET_LUFS) < 0.01:
+            if abs(float(previous.get('target_lufs', target)) - target) < 0.01:
                 return None
             print(f'[loudness] {video_id}: re-normalising for new target '
-                  f'{TARGET_LUFS} LUFS', flush=True)
+                  f'{target} LUFS', flush=True)
         except (OSError, ValueError, TypeError):
             pass
     measured = _measure_loudness(path)
@@ -1094,12 +1130,15 @@ def _apply_loudness(path, video_id):
         print(f'[loudness] {video_id}: no usable audio (I={i_lufs})', flush=True)
         return None
 
-    gain = TARGET_LUFS - i_lufs
-    if tp > -90:                 # cap so true peaks stay below TARGET_TP
-        gain = min(gain, TARGET_TP - tp)
+    gain = target - i_lufs
+    if gain > 0 and tp > -90:
+        # Only limit a BOOST to the available headroom. Never pull a track down
+        # below its original level just because its master already peaks hot —
+        # that made loud-but-clipping YouTube uploads quieter than the source.
+        gain = min(gain, max(0.0, TARGET_TP - tp))
     gain = max(-MAX_GAIN_DB, min(MAX_GAIN_DB, gain))
     info = {'input_lufs': round(i_lufs, 2), 'input_true_peak': round(tp, 2),
-            'target_lufs': TARGET_LUFS, 'gain_db': round(gain, 2),
+            'target_lufs': target, 'gain_db': round(gain, 2),
             'applied': abs(gain) >= 0.5}
 
     if info['applied']:
@@ -1194,6 +1233,10 @@ def _prepare_video(video_id):
         except subprocess.TimeoutExpired:
             return None
         if os.path.exists(path) and os.path.getsize(path) > 100_000:
+            # Normalise on the way out so even the first play is levelled; the
+            # sidecar makes every later play a no-op.
+            if NORMALIZE_AUDIO:
+                _apply_loudness(path, video_id)
             _prune_video_cache()
             return path
         try:
@@ -1744,6 +1787,34 @@ def admin_settings_chat():
         CHAT_ENABLED = request.json.get('show', False)
         return jsonify({'success': True, 'show': CHAT_ENABLED})
     return jsonify({'show': CHAT_ENABLED})
+
+
+@app.route('/admin/settings/loudness', methods=['GET', 'POST'])
+@login_required
+def admin_settings_loudness():
+    """Get or set the loudness normalisation target (LUFS).
+
+    Higher (closer to 0) = louder output. -14 matches Spotify/YouTube, -16 is
+    the broadcast-ish default, -11 is loud party level.
+    """
+    if not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized'}), 403
+    global LOUDNESS_TARGET
+    if request.method == 'POST':
+        data = request.get_json(silent=True) or {}
+        try:
+            val = float(data.get('target', LOUDNESS_TARGET))
+        except (TypeError, ValueError):
+            return jsonify({'error': 'target must be a number'}), 400
+        if not (LOUDNESS_TARGET_MIN <= val <= LOUDNESS_TARGET_MAX):
+            return jsonify({'error': f'target must be between '
+                                     f'{LOUDNESS_TARGET_MIN:g} and {LOUDNESS_TARGET_MAX:g} LUFS'}), 400
+        LOUDNESS_TARGET = round(val, 1)
+        set_setting('loudness_target', LOUDNESS_TARGET)
+        print(f'[loudness] admin set target to {LOUDNESS_TARGET} LUFS', flush=True)
+        return jsonify({'success': True, 'target': LOUDNESS_TARGET})
+    return jsonify({'target': LOUDNESS_TARGET,
+                    'min': LOUDNESS_TARGET_MIN, 'max': LOUDNESS_TARGET_MAX})
 
 
 @app.route('/admin/change-password', methods=['POST'])

@@ -309,6 +309,20 @@
                             <span id="limitSaved" style="display:none;font-size:0.65rem;color:#1db954;">Saved</span>
                         </div>
                     </div>
+                    <div class="toggle-row" style="border-bottom:none;flex-direction:column;align-items:stretch;gap:6px;padding-bottom:2px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <span style="font-size:0.75rem;">Normalizer Level</span>
+                            <span id="loudnessValue" style="font-size:0.75rem;color:#1db954;font-weight:600;">-14.0 LUFS</span>
+                        </div>
+                        <input type="range" id="loudnessSlider" min="-24" max="-8" step="0.5" value="-14"
+                               style="width:100%;accent-color:#1db954;cursor:pointer;">
+                        <div style="display:flex;justify-content:space-between;font-size:0.6rem;color:#666;">
+                            <span>Quieter -24</span><span>Spotify -14</span><span>Louder -8</span>
+                        </div>
+                        <div style="display:flex;justify-content:flex-end;">
+                            <span id="loudnessSaved" style="display:none;font-size:0.6rem;color:#1db954;">Saved - applies from the next track</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -627,6 +641,32 @@
                 }
             }).catch(() => {});
     }
+
+    /** Loudness normalizer slider — lower LUFS = quieter, -14 = Spotify/YouTube */
+    (function initLoudness() {
+        const slider = document.getElementById('loudnessSlider');
+        const label = document.getElementById('loudnessValue');
+        const saved = document.getElementById('loudnessSaved');
+        if (!slider) return;
+        const paint = v => { label.textContent = Number(v).toFixed(1) + ' LUFS'; };
+        fetch('/admin/settings/loudness').then(r => r.json()).then(d => {
+            if (typeof d.target === 'number') { slider.value = d.target; paint(d.target); }
+        }).catch(() => {});
+        slider.addEventListener('input', e => paint(e.target.value));
+        slider.addEventListener('change', e => {
+            const target = parseFloat(e.target.value);
+            fetch('/admin/settings/loudness', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({target})
+            }).then(r => r.json()).then(d => {
+                if (d.success) {
+                    paint(d.target);
+                    saved.style.display = 'inline';
+                    setTimeout(() => saved.style.display = 'none', 2500);
+                }
+            }).catch(() => {});
+        });
+    })();
 
     /** Clear all history */
     function clearHistory() {
