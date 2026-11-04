@@ -1035,8 +1035,8 @@ _video_locks_guard = threading.Lock()
 # static gain so every song plays at the same perceived level.
 FFMPEG = shutil.which('ffmpeg') or 'ffmpeg'
 NORMALIZE_AUDIO = os.environ.get('CLOUDDJ_NORMALIZE', '1') != '0'
-TARGET_LUFS = float(os.environ.get('CLOUDDJ_TARGET_LUFS', '-16'))
-TARGET_TP = float(os.environ.get('CLOUDDJ_TARGET_TP', '-1.5'))
+TARGET_LUFS = float(os.environ.get('CLOUDDJ_TARGET_LUFS', '-14'))
+TARGET_TP = float(os.environ.get('CLOUDDJ_TARGET_TP', '-1.0'))
 MAX_GAIN_DB = float(os.environ.get('CLOUDDJ_MAX_GAIN_DB', '18'))
 
 
@@ -1075,7 +1075,16 @@ def _apply_loudness(path, video_id):
         return None
     sidecar = _loudness_sidecar(video_id)
     if os.path.exists(sidecar):
-        return None
+        # Already measured: skip unless the target level changed since then.
+        try:
+            with open(sidecar) as fh:
+                previous = json.load(fh)
+            if abs(float(previous.get('target_lufs', TARGET_LUFS)) - TARGET_LUFS) < 0.01:
+                return None
+            print(f'[loudness] {video_id}: re-normalising for new target '
+                  f'{TARGET_LUFS} LUFS', flush=True)
+        except (OSError, ValueError, TypeError):
+            pass
     measured = _measure_loudness(path)
     if not measured:
         print(f'[loudness] {video_id}: measurement failed', flush=True)
