@@ -10,3 +10,7 @@ venv/
 *.db-wal
 *.db-shm
 .secret_key
+graphify-out/cache/
+video_cache/
+logs/
+

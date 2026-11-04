@@ -1,0 +1,32 @@
+{
+  "app.py": {
+    "mtime": 1793766236.1228735,
+    "seen": 1793766500.4045844,
+    "ast_hash": "c29da8acbf7e3bcebb78aaef1a68b6d3",
+    "semantic_hash": "c29da8acbf7e3bcebb78aaef1a68b6d3"
+  },
+  "backup.sh": {
+    "mtime": 1793684922.2407923,
+    "seen": 1793766500.404595,
+    "ast_hash": "ca05ed61d1978df8f4ff8d401c867553",
+    "semantic_hash": "ca05ed61d1978df8f4ff8d401c867553"
+  },
+  "install.ps1": {
+    "mtime": 1793684922.2407923,
+    "seen": 1793766500.4046202,
+    "ast_hash": "d778a2c9465f4e6bef9fce14aafe9591",
+    "semantic_hash": "d778a2c9465f4e6bef9fce14aafe9591"
+  },
+  "install.sh": {
+    "mtime": 1793684922.2407923,
+    "seen": 1793766500.4046283,
+    "ast_hash": "8f8c0fb98ac4d5ec3dcdd62b3c76f637",
+    "semantic_hash": "8f8c0fb98ac4d5ec3dcdd62b3c76f637"
+  },
+  "static/applause.wav": {
+    "mtime": 1793684922.2487922,
+    "seen": 1793766500.4046345,
+    "ast_hash": "794e32ca27b666d458084039efe1b0a3",
+    "semantic_hash": "794e32ca27b666d458084039efe1b0a3"
+  }
+}

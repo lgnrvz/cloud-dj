@@ -1,0 +1,396 @@
+{
+  "communities": {
+    "0": [
+      "app",
+      "app_current_commit",
+      "app_rationale_469",
+      "base64",
+      "datetime",
+      "flask",
+      "flask_login",
+      "flask_socketio",
+      "hashlib",
+      "json",
+      "os",
+      "random",
+      "re",
+      "secrets",
+      "shutil",
+      "signal",
+      "socket",
+      "sqlite3",
+      "subprocess",
+      "sys",
+      "threading",
+      "time",
+      "urllib_parse",
+      "urllib_request"
+    ],
+    "1": [
+      "app_admin_change_password",
+      "app_admin_users",
+      "app_ban_check",
+      "app_ban_state",
+      "app_check_password_hash",
+      "app_forgot_password",
+      "app_generate_password_hash",
+      "app_init_db",
+      "app_login",
+      "app_loved_songs",
+      "app_rationale_13",
+      "app_rationale_1704",
+      "app_rationale_31",
+      "app_rationale_444",
+      "app_rationale_53",
+      "app_rationale_629",
+      "app_rationale_685",
+      "app_signup",
+      "before_request"
+    ],
+    "2": [
+      "app_advance",
+      "app_auto_start",
+      "app_enrich_now",
+      "app_get_next_pending",
+      "app_now_playing",
+      "app_queue",
+      "app_rationale_1377",
+      "app_rationale_1410",
+      "app_rationale_465",
+      "app_rationale_481",
+      "app_rationale_705",
+      "app_rationale_748",
+      "app_remove_item",
+      "app_set_now_playing",
+      "app_skip"
+    ],
+    "3": [
+      "app_admin",
+      "app_admin_love",
+      "app_clear_leaderboard",
+      "app_clear_users",
+      "app_export_csv",
+      "app_get_db",
+      "app_import_csv",
+      "app_leaderboard",
+      "app_logout",
+      "app_remove_user",
+      "app_reorder",
+      "app_save_score",
+      "login_required"
+    ],
+    "4": [
+      "app_admin_settings",
+      "app_admin_settings_leaderboard",
+      "app_admin_settings_suggested",
+      "app_index",
+      "app_leaderboard_enabled",
+      "app_love_toggle",
+      "app_proxy_video",
+      "app_rationale_1249",
+      "app_rationale_1637",
+      "app_rationale_1678",
+      "app_scoring_enabled",
+      "route"
+    ],
+    "5": [
+      "app_add",
+      "app_add_from_loved",
+      "app_auto_advance",
+      "app_clean_yt_url",
+      "app_fetch_title",
+      "app_rationale_1313",
+      "app_rationale_1916",
+      "app_rationale_417",
+      "app_rationale_892",
+      "app_replay_from_history",
+      "app_run_ytdl"
+    ],
+    "6": [
+      "app_cached_video_path",
+      "app_direct_video",
+      "app_muxed_video",
+      "app_prepare_video",
+      "app_prune_video_cache",
+      "app_rationale_1154",
+      "app_rationale_1166",
+      "app_rationale_1209",
+      "app_rationale_1224",
+      "app_video_lock",
+      "app_ytdlp_base"
+    ],
+    "7": [
+      "install_install_direct",
+      "install_install_withwinget",
+      "install_ps1_install",
+      "install_refresh_path",
+      "install_test_realcommand",
+      "install_test_validpe",
+      "install_write_err",
+      "install_write_info",
+      "install_write_ok",
+      "install_write_warn"
+    ],
+    "8": [
+      "app_admin_system",
+      "app_lan_ip",
+      "app_rationale_1491",
+      "app_rationale_91",
+      "app_read_proc",
+      "app_system_stats",
+      "app_system_stats_mem_kb"
+    ],
+    "9": [
+      "install_err",
+      "install_info",
+      "install_ok",
+      "install_sh__entry",
+      "install_sh_install",
+      "install_warn"
+    ],
+    "10": [
+      "app_apply_loudness",
+      "app_loudness_sidecar",
+      "app_measure_loudness",
+      "app_rationale_1048",
+      "app_rationale_1067"
+    ],
+    "11": [
+      "app_handle_connect",
+      "app_handle_react_message",
+      "app_handle_send_message",
+      "app_rationale_2014",
+      "on"
+    ],
+    "12": [
+      "app_load_user",
+      "app_user",
+      "app_user_init",
+      "user_loader",
+      "usermixin"
+    ],
+    "13": [
+      "app_proxy_seg",
+      "app_proxy_seg_generate",
+      "app_rationale_1278"
+    ],
+    "14": [
+      "app_rationale_959",
+      "app_stream_audio",
+      "app_stream_audio_generate"
+    ],
+    "15": [
+      "app_admin_history",
+      "app_rationale_1551"
+    ],
+    "16": [
+      "app_admin_settings_chat",
+      "app_rationale_1691"
+    ],
+    "17": [
+      "app_admin_settings_consecutive",
+      "app_rationale_1660"
+    ],
+    "18": [
+      "app_ban_user",
+      "app_rationale_1498"
+    ],
+    "19": [
+      "app_clear_history",
+      "app_rationale_1625"
+    ],
+    "20": [
+      "app_downloads",
+      "app_rationale_1841"
+    ],
+    "21": [
+      "app_inject_commit",
+      "context_processor"
+    ],
+    "22": [
+      "app_rationale_1004",
+      "app_search_history"
+    ],
+    "23": [
+      "app_rationale_1339",
+      "app_suggested"
+    ],
+    "24": [
+      "app_rationale_1533",
+      "app_unban_user"
+    ],
+    "25": [
+      "app_rationale_941",
+      "app_remove_loved"
+    ],
+    "26": [
+      "backup",
+      "backup_sh__entry"
+    ]
+  },
+  "cohesion": {
+    "0": 0.08333333333333333,
+    "1": 0.1111111111111111,
+    "2": 0.2,
+    "3": 0.2564102564102564,
+    "4": 0.16666666666666666,
+    "5": 0.2,
+    "6": 0.18181818181818182,
+    "7": 0.4222222222222222,
+    "8": 0.2857142857142857,
+    "9": 0.6,
+    "10": 0.4,
+    "11": 0.4,
+    "12": 0.4,
+    "13": 0.6666666666666666,
+    "14": 0.6666666666666666,
+    "15": 1.0,
+    "16": 1.0,
+    "17": 1.0,
+    "18": 1.0,
+    "19": 1.0,
+    "20": 1.0,
+    "21": 1.0,
+    "22": 1.0,
+    "23": 1.0,
+    "24": 1.0,
+    "25": 1.0,
+    "26": 1.0
+  },
+  "gods": [
+    {
+      "id": "app_get_db",
+      "label": "get_db()",
+      "degree": 45
+    },
+    {
+      "id": "app_prepare_video",
+      "label": "_prepare_video()",
+      "degree": 9
+    },
+    {
+      "id": "app_advance",
+      "label": "advance()",
+      "degree": 8
+    },
+    {
+      "id": "app_enrich_now",
+      "label": "_enrich_now()",
+      "degree": 8
+    },
+    {
+      "id": "app_get_next_pending",
+      "label": "get_next_pending()",
+      "degree": 8
+    },
+    {
+      "id": "app_set_now_playing",
+      "label": "set_now_playing()",
+      "degree": 8
+    },
+    {
+      "id": "app_skip",
+      "label": "skip()",
+      "degree": 8
+    },
+    {
+      "id": "app_add",
+      "label": "add()",
+      "degree": 8
+    },
+    {
+      "id": "app_auto_advance",
+      "label": "auto_advance()",
+      "degree": 8
+    },
+    {
+      "id": "app_admin_change_password",
+      "label": "admin_change_password()",
+      "degree": 7
+    }
+  ],
+  "surprises": [
+    {
+      "source": "login()",
+      "target": "User",
+      "source_files": [
+        "app.py",
+        "app.py"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "note": "Bridges community 12 → community 1"
+    },
+    {
+      "source": "admin_change_password()",
+      "target": "get_db()",
+      "source_files": [
+        "app.py",
+        "app.py"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "note": "Bridges community 1 → community 3"
+    },
+    {
+      "source": "admin_change_password()",
+      "target": "route",
+      "source_files": [
+        "app.py",
+        ""
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "references",
+      "note": "Bridges community 1 → community 4"
+    },
+    {
+      "source": "_prepare_video()",
+      "target": "_apply_loudness()",
+      "source_files": [
+        "app.py",
+        "app.py"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "note": "Bridges community 10 → community 6"
+    },
+    {
+      "source": "handle_connect()",
+      "target": "get_db()",
+      "source_files": [
+        "app.py",
+        "app.py"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "note": "Bridges community 11 → community 3"
+    }
+  ],
+  "questions": [
+    {
+      "type": "bridge_node",
+      "question": "Why does `get_db()` connect `Community 3` to `Community 0`, `Community 1`, `Community 2`, `Community 4`, `Community 5`, `Community 11`, `Community 12`, `Community 14`, `Community 15`, `Community 18`, `Community 19`, `Community 22`, `Community 23`, `Community 24`, `Community 25`?",
+      "why": "High betweenness centrality (0.062) - this node is a cross-community bridge."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `Community 0` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.08333333333333333 - nodes in this community are weakly interconnected."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `_system_stats()` connect `Community 8` to `Community 0`?",
+      "why": "High betweenness centrality (0.021) - this node is a cross-community bridge."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `Community 1` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.1111111111111111 - nodes in this community are weakly interconnected."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `proxy_seg()` connect `Community 13` to `Community 0`, `Community 3`, `Community 4`?",
+      "why": "High betweenness centrality (0.021) - this node is a cross-community bridge."
+    }
+  ]
+}
