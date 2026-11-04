@@ -340,6 +340,10 @@
 
         /* ─── Suggested refresh button ─── */
         #suggestedRefresh:hover { color: #1db954; }
+        /* genre-matched top 3 — soft tints, not garish */
+        .loved-item.sugg-rank-1 { background: rgba(90,150,255,0.16); box-shadow: inset 2px 0 0 rgba(90,150,255,0.55); }
+        .loved-item.sugg-rank-2 { background: rgba(255,90,90,0.14);  box-shadow: inset 2px 0 0 rgba(255,90,90,0.50); }
+        .loved-item.sugg-rank-3 { background: rgba(40,200,110,0.14); box-shadow: inset 2px 0 0 rgba(40,200,110,0.50); }
 
         #chatCard.minimized #chatMessages,
         #chatCard.minimized #chatInputRow,
@@ -1512,7 +1516,7 @@
                 return;
             }
             list.innerHTML = d.items.map(item =>
-                '<div class="loved-item" style="padding:8px 12px;">'
+                '<div class="loved-item' + (item.rank && item.rank <= 3 ? ' sugg-rank-' + item.rank : '') + '" style="padding:8px 12px;">'
                 + '<div class="title" style="font-size:0.75rem;">' + escapeHtml(item.title) + '</div>'
                 + '<div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">'
                 + '<button class="add-btn" style="font-size:0.65rem;padding:2px 6px;" onclick="addSuggested(' + item.id + ', this)">+</button>'
@@ -1534,10 +1538,12 @@
             .then(d => {
                 if (d && d.success) {
                     showToast('Added: ' + d.title);
-                    // Remove the row, then fill the slot with a fresh random song
+                    // Remove the row, then refill the same slot with a fresh
+                    // random song (a replaced slot is always plain, no rank tint)
                     const row = btn.closest('.loved-item');
+                    const slot = row ? Array.from(row.parentNode.children).indexOf(row) : -1;
                     if (row) row.remove();
-                    fillSuggestedSlot();
+                    fillSuggestedSlot(slot);
                     refreshQueueList();
                 }
             })
@@ -1545,7 +1551,7 @@
     }
 
     /** Fetch one new random suggestion (excluding current list) to fill a slot */
-    async function fillSuggestedSlot() {
+    async function fillSuggestedSlot(slot) {
         const list = document.getElementById('suggestedList');
         if (!list) return;
         const ids = [];
@@ -1554,7 +1560,7 @@
             if (m) ids.push(m[1]);
         });
         try {
-            const resp = await fetch('/suggested?limit=1&exclude=' + ids.join(','));
+            const resp = await fetch('/suggested?limit=1&plain=1&exclude=' + ids.join(','));
             if (!resp.ok) return;
             const d = await resp.json();
             if (!d.items.length) return;
@@ -1566,7 +1572,11 @@
                 + '<div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">'
                 + '<button class="add-btn" style="font-size:0.65rem;padding:2px 6px;" onclick="addSuggested(' + item.id + ', this)">+</button>'
                 + '</div>';
-            list.appendChild(row);
+            if (typeof slot === 'number' && slot >= 0 && slot < list.children.length) {
+                list.insertBefore(row, list.children[slot]);
+            } else {
+                list.appendChild(row);
+            }
         } catch(e) {}
     }
 

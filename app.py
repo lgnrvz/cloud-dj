@@ -402,6 +402,14 @@ def init_db():
         key TEXT PRIMARY KEY,
         value TEXT
     )""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS song_meta (
+        video_id TEXT PRIMARY KEY,
+        artist TEXT,
+        song TEXT,
+        genre TEXT,
+        source TEXT,
+        fetched_at TEXT
+    )""")
     admin = conn.execute("SELECT id FROM users WHERE username='admin'").fetchone()
     if not admin:
         conn.execute("INSERT INTO users (name, username, password, is_admin) VALUES (?, ?, ?, ?)",
@@ -1426,8 +1434,13 @@ def replay_from_history(item_id):
 @app.route('/suggested')
 @login_required
 def suggested():
-    """Return random songs from history for the suggested card.
-    Supports ?limit=N and ?exclude=id1,id2 to exclude already-listed items."""
+    """Suggestions for the queue card.
+
+    If the current track's genre is known, its three most-played songs in that
+    same genre lead the list (rank 1-3, colour-coded in the UI); the remaining
+    slots are filled with random history.
+    Supports ?limit=N and ?exclude=id1,id2 to exclude already-listed items.
+    """
     limit = min(request.args.get('limit', 5, type=int), 10)
     exclude_ids = []
     for x in request.args.get('exclude', '').split(','):
@@ -1435,28 +1448,50 @@ def suggested():
             exclude_ids.append(int(x))
         except (ValueError, TypeError):
             pass
+
+    def vid_of(url):
+        m = re.search(r'(?:v=|/)([\w-]{11})(?:\?|&|$)', url or '')
+        return m.group(1) if m else None
+
     conn = get_db()
-    # Get played songs, excluding any already in the queue
-    sql = (
-        "SELECT id, title, username, clean_url FROM queue "
+    played = conn.execute(
+        "SELECT id, title, username, clean_url, COUNT(*) AS plays FROM queue "
         "WHERE status='played' AND clean_url NOT IN "
-        "(SELECT clean_url FROM queue WHERE status != 'played')"
-    )
-    params = []
-    if exclude_ids:
-        ph = ','.join('?' * len(exclude_ids))
-        sql += f" AND id NOT IN ({ph})"
-        params.extend(exclude_ids)
-    sql += " GROUP BY clean_url ORDER BY RANDOM() LIMIT ?"
-    params.append(limit)
-    rows = conn.execute(sql, params).fetchall()
+        "(SELECT clean_url FROM queue WHERE status NOT IN ('played','failed')) "
+        "GROUP BY clean_url ORDER BY plays DESC"
+    ).fetchall()
+    genres = {r['video_id']: r['genre']
+              for r in conn.execute("SELECT video_id, genre FROM song_meta")}
     conn.close()
-    return jsonify({
-        'items': [{
-            'id': r['id'], 'title': r['title'],
-            'username': r['username'], 'clean_url': r['clean_url']
-        } for r in rows]
-    })
+
+    cur_vid = vid_of(NOW_PLAYING.get('url') or '')
+    cur_genre = genres.get(cur_vid) if cur_vid else None
+
+    def payload(r, rank):
+        return {'id': r['id'], 'title': r['title'], 'username': r['username'],
+                'clean_url': r['clean_url'], 'rank': rank}
+
+    items, used = [], set(exclude_ids)
+    plain = request.args.get('plain') == '1'
+    if cur_genre and not plain:
+        want = min(3, limit)
+        for r in played:
+            if len(items) >= want:
+                break
+            if r['id'] in used:
+                continue
+            if genres.get(vid_of(r['clean_url'])) == cur_genre:
+                items.append(payload(r, len(items) + 1))
+                used.add(r['id'])
+
+    pool = [r for r in played if r['id'] not in used]
+    random.shuffle(pool)
+    for r in pool:
+        if len(items) >= limit:
+            break
+        items.append(payload(r, None))
+
+    return jsonify({'items': items, 'genre': cur_genre})
 
 
 # ─── PLAYER ADVANCEMENT ───
