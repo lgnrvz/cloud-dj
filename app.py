@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, Response, stream_with_context, session, send_file
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_socketio import SocketIO, emit, join_room
-import sqlite3, os, threading, subprocess, re, signal, random, time, sys, hashlib, secrets, socket
+import sqlite3, os, threading, subprocess, re, signal, random, time, sys, hashlib, secrets, socket, json
 import urllib.request, urllib.parse
 from base64 import b64encode
 from datetime import datetime, timedelta
@@ -1030,6 +1030,103 @@ VIDEO_CACHE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'video_ca
 _video_locks = {}
 _video_locks_guard = threading.Lock()
 
+# Loudness normalisation — YouTube sources swing wildly (a -30 LUFS acoustic
+# demo next to a -8 LUFS remaster). Measure each prepared file, then apply one
+# static gain so every song plays at the same perceived level.
+FFMPEG = shutil.which('ffmpeg') or 'ffmpeg'
+NORMALIZE_AUDIO = os.environ.get('CLOUDDJ_NORMALIZE', '1') != '0'
+TARGET_LUFS = float(os.environ.get('CLOUDDJ_TARGET_LUFS', '-16'))
+TARGET_TP = float(os.environ.get('CLOUDDJ_TARGET_TP', '-1.5'))
+MAX_GAIN_DB = float(os.environ.get('CLOUDDJ_MAX_GAIN_DB', '18'))
+
+
+def _loudness_sidecar(video_id):
+    return os.path.join(VIDEO_CACHE, video_id + '.loudness.json')
+
+
+def _measure_loudness(path):
+    """Return (integrated_lufs, true_peak_dbtp) via ffmpeg's EBU R128 meter."""
+    cmd = [FFMPEG, '-hide_banner', '-nostats', '-i', path, '-map', '0:a:0',
+           '-af', 'loudnorm=print_format=json', '-f', 'null', '-']
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+    except (subprocess.TimeoutExpired, OSError):
+        return None
+    out = result.stderr or ''
+    start, end = out.rfind('{'), out.rfind('}')
+    if start < 0 or end <= start:
+        return None
+    try:
+        data = json.loads(out[start:end + 1])
+        return float(data.get('input_i')), float(data.get('input_tp'))
+    except (ValueError, TypeError):
+        return None
+
+
+def _apply_loudness(path, video_id):
+    """Apply a static gain so the track lands near TARGET_LUFS.
+
+    Static gain (not dynamic loudnorm) keeps the song's own dynamics and avoids
+    pumping; the true-peak cap plus a limiter stops quiet sources from clipping
+    when they get boosted. Writes <id>.loudness.json next to the cache file so
+    the measured level is inspectable without re-analysing.
+    """
+    if not NORMALIZE_AUDIO:
+        return None
+    sidecar = _loudness_sidecar(video_id)
+    if os.path.exists(sidecar):
+        return None
+    measured = _measure_loudness(path)
+    if not measured:
+        print(f'[loudness] {video_id}: measurement failed', flush=True)
+        return None
+    i_lufs, tp = measured
+    if i_lufs <= -70:            # silence / no usable audio track
+        print(f'[loudness] {video_id}: no usable audio (I={i_lufs})', flush=True)
+        return None
+
+    gain = TARGET_LUFS - i_lufs
+    if tp > -90:                 # cap so true peaks stay below TARGET_TP
+        gain = min(gain, TARGET_TP - tp)
+    gain = max(-MAX_GAIN_DB, min(MAX_GAIN_DB, gain))
+    info = {'input_lufs': round(i_lufs, 2), 'input_true_peak': round(tp, 2),
+            'target_lufs': TARGET_LUFS, 'gain_db': round(gain, 2),
+            'applied': abs(gain) >= 0.5}
+
+    if info['applied']:
+        tmp = path + '.norm.mp4'
+        cmd = [FFMPEG, '-hide_banner', '-loglevel', 'error', '-y', '-i', path,
+               '-map', '0:v:0', '-map', '0:a:0', '-c:v', 'copy',
+               '-af', f'volume={gain:.2f}dB,alimiter=limit=0.94:attack=5:release=50',
+               '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', tmp]
+        try:
+            subprocess.run(cmd, capture_output=True, timeout=300)
+            ok = os.path.exists(tmp) and os.path.getsize(tmp) > 100_000
+        except (subprocess.TimeoutExpired, OSError):
+            ok = False
+        if ok:
+            try:
+                os.replace(tmp, path)
+            except OSError:
+                ok = False
+        if not ok:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+            info['applied'] = False
+            print(f'[loudness] {video_id}: normalisation failed, keeping original', flush=True)
+
+    try:
+        with open(sidecar, 'w') as fh:
+            json.dump(info, fh)
+    except OSError:
+        pass
+    print(f'[loudness] {video_id}: I={info["input_lufs"]} LUFS '
+          f'TP={info["input_true_peak"]} -> gain {info["gain_db"]:+} dB '
+          f'({"applied" if info["applied"] else "skipped"})', flush=True)
+    return gain
+
 
 def _video_lock(video_id):
     with _video_locks_guard:
@@ -1066,10 +1163,15 @@ def _prepare_video(video_id):
     """
     path = _cached_video_path(video_id)
     if os.path.exists(path) and os.path.getsize(path) > 100_000:
+        if NORMALIZE_AUDIO and not os.path.exists(_loudness_sidecar(video_id)):
+            with _video_lock(video_id):
+                _apply_loudness(path, video_id)
         return path
     os.makedirs(VIDEO_CACHE, exist_ok=True)
     with _video_lock(video_id):
         if os.path.exists(path) and os.path.getsize(path) > 100_000:
+            if NORMALIZE_AUDIO and not os.path.exists(_loudness_sidecar(video_id)):
+                _apply_loudness(path, video_id)
             return path
         fmt = ('bv*[ext=mp4][vcodec^=avc1][height<=720]+ba[ext=m4a]/'
                'bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b')
