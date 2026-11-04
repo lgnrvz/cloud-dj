@@ -660,7 +660,7 @@ def queue():
     conn = get_db()
     items = conn.execute(
         "SELECT *, strftime('%H:%M', created_at, '+8 hours') as created_at_ph "
-        "FROM queue WHERE status != 'played' "
+        "FROM queue WHERE status NOT IN ('played','failed') "
         "ORDER BY CASE WHEN status='playing' THEN 0 ELSE 1 END, priority DESC, id ASC"
     ).fetchall()
     played = conn.execute(
@@ -1219,7 +1219,51 @@ def muxed_video():
     return resp
 
 
+def _advance_from_failed(item_id):
+    """Mark a queue item unusable and move the player to the next track."""
+    global NOW_PLAYING
+    conn = get_db()
+    conn.execute("UPDATE queue SET status='failed' WHERE id=?", (item_id,))
+    conn.commit()
+    conn.close()
+
+    next_item = get_next_pending()
+    set_now_playing(next_item)
+    if next_item:
+        conn = get_db()
+        conn.execute("UPDATE queue SET status='playing' WHERE id=?", (next_item['id'],))
+        conn.commit()
+        conn.close()
+    return _enrich_now(dict(NOW_PLAYING))
+
+
+def _fail_current_video(video_id):
+    """If the failing video is the current item, mark it failed and advance.
+
+    Returns the enriched next now-playing dict when a skip happened, else None.
+    """
+    cur_id = NOW_PLAYING.get('id')
+    cur_url = NOW_PLAYING.get('url') or ''
+    if not cur_id or cur_id <= 0 or video_id not in cur_url:
+        return None
+    print(f'[skip] item {cur_id} unavailable '
+          f'({NOW_PLAYING.get("title")}) -> advancing', flush=True)
+    return _advance_from_failed(cur_id)
+
+
+@app.route('/fail-current', methods=['POST'])
+@login_required
+def fail_current():
+    """Client reports that the current track cannot be played (decode/stream
+    error, stall). Marks it failed so it is never offered again, then advances."""
+    cur_id = NOW_PLAYING.get('id')
+    if not cur_id or cur_id <= 0:
+        return jsonify({'skipped': None})
+    return jsonify({'skipped': _advance_from_failed(cur_id)})
+
+
 @app.route('/direct-video')
+@login_required
 def direct_video():
     """Return a playable URL for the browser HTML5 <video> element.
 
@@ -1235,7 +1279,10 @@ def direct_video():
 
     path = _prepare_video(video_id)
     if not path:
-        return jsonify({'error': 'Failed to prepare video'}), 502
+        # If the video that just failed is the one playing now, drop it and move
+        # on so the player can't wedge on a permanently unavailable source.
+        skipped = _fail_current_video(video_id)
+        return jsonify({'error': 'Failed to prepare video', 'skipped': skipped}), 502
     return jsonify({
         'video_url': '/muxed-video?url=' + urllib.parse.quote(
             'https://www.youtube.com/watch?v=' + video_id, safe=''),
@@ -1384,10 +1431,11 @@ def advance():
     global NOW_PLAYING
     current_id = NOW_PLAYING.get('id')
 
-    # Mark current as played if it's a real queue item
+    # Mark current as played if it's a real queue item (never resurrect a 'failed' one)
     if current_id and current_id > 0:
         conn = get_db()
-        conn.execute("UPDATE queue SET status='played' WHERE id=?", (current_id,))
+        conn.execute("UPDATE queue SET status='played' WHERE id=? AND status!='failed'",
+                     (current_id,))
         conn.commit()
         conn.close()
 

@@ -714,6 +714,41 @@
         nowMeta.textContent = username;
     }
 
+    /** A track that cannot be played must never wedge the player:
+     *  drop it server-side and move on to the next one. */
+    let skipGuard = 0;
+    async function skipUnavailable(reason) {
+        if (skipGuard >= 10) {
+            setStatus('#ff4444', 'Too many unavailable videos');
+            loadingNext = false;
+            return;
+        }
+        skipGuard++;
+        setStatus('#ff4444', 'Skipping unavailable video...');
+        try {
+            video.pause();
+            video.removeAttribute('src');
+            video.load();
+            videoContainer.style.display = 'none';
+            let next = null;
+            const r = await fetch('/fail-current', { method: 'POST' });
+            if (r.ok) {
+                const d = await r.json();
+                next = d.skipped;
+            }
+            if (!next) {
+                const ra = await fetch('/advance', { method: 'POST' });
+                next = await ra.json();
+            }
+            updateNowUi(next.title, next.username);
+            if (typeof refreshQueueList === 'function') refreshQueueList();
+            await loadTrack(next);
+        } catch (e) {
+            setStatus('#444', 'Error skipping unavailable video');
+            loadingNext = false;
+        }
+    }
+
     /** Load a track — shows spinner while fetching, then plays */
     async function loadTrack(np) {
         // Set ID immediately to prevent poll race (next interval fires at 4s)
@@ -776,32 +811,40 @@
                     await playReady;
                     await video.play();
                     setStatus('#1db954', 'Playing');
+                    skipGuard = 0;
                 } catch (e) {
+                    if (video.error) {
+                        // Real decode/stream failure — never leave the player stuck
+                        await skipUnavailable('playback error');
+                        return;
+                    }
                     setStatus('#ffd700', 'Click play');
                 }
+
+                // Watchdog: a prepared file should start almost immediately. If it
+                // never buffers, treat it as unavailable instead of hanging here.
+                const stalledId = np.id;
+                setTimeout(() => {
+                    if (currentPlayingId === stalledId && video.readyState < 2 && !video.error) {
+                        skipUnavailable('stalled');
+                    }
+                }, 20000);
+            } else if (d.skipped) {
+                // Server already dropped this item and picked the next one
+                videoLoading.classList.remove('show');
+                skipGuard++;
+                updateNowUi(d.skipped.title, d.skipped.username);
+                if (typeof refreshQueueList === 'function') refreshQueueList();
+                await loadTrack(d.skipped);
+                return;
             } else {
-                videoContainer.style.display = 'none';
-                video.pause();
-                video.removeAttribute('src');
-                video.load();
-                setStatus('#ffd700', 'Stream unavailable');
-                // Auto-advance only for Auto-DJ; keep real queue items for skip
-                if (np.is_auto_dj) {
-                    try {
-                        const resp = await fetch('/advance', { method: 'POST' });
-                        const adel = await resp.json();
-                        updateNowUi(adel.title, adel.username);
-                        await loadTrack(adel);
-                    } catch(e) {}
-                }
+                await skipUnavailable('stream unavailable');
+                return;
             }
         } catch (e) {
             videoLoading.classList.remove('show');
-            videoContainer.style.display = 'none';
-            video.pause();
-            video.removeAttribute('src');
-            video.load();
-            setStatus('#444', 'Error loading');
+            await skipUnavailable('load error');
+            return;
         }
 
         // Skip button — visible for admin, but hidden when Auto-DJ with no history
