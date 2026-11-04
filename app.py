@@ -1172,14 +1172,14 @@ def _prepare_video(video_id):
     """
     path = _cached_video_path(video_id)
     if os.path.exists(path) and os.path.getsize(path) > 100_000:
-        if NORMALIZE_AUDIO and not os.path.exists(_loudness_sidecar(video_id)):
+        if NORMALIZE_AUDIO:
             with _video_lock(video_id):
-                _apply_loudness(path, video_id)
+                _apply_loudness(path, video_id)   # no-op when target already met
         return path
     os.makedirs(VIDEO_CACHE, exist_ok=True)
     with _video_lock(video_id):
         if os.path.exists(path) and os.path.getsize(path) > 100_000:
-            if NORMALIZE_AUDIO and not os.path.exists(_loudness_sidecar(video_id)):
+            if NORMALIZE_AUDIO:
                 _apply_loudness(path, video_id)
             return path
         fmt = ('bv*[ext=mp4][vcodec^=avc1][height<=720]+ba[ext=m4a]/'
