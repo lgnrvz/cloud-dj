@@ -1623,6 +1623,9 @@ def suggested():
 
     cur_vid = vid_of(NOW_PLAYING.get('url') or '')
     cur_genre = genres.get(cur_vid) if cur_vid else None
+    # Never suggest the song that is already playing
+    if cur_vid:
+        played = [r for r in played if vid_of(r['clean_url']) != cur_vid]
     if cur_vid and not cur_genre:
         # Unknown genre — look it up in the background; the next refresh picks
         # it up instead of the top 3 silently disappearing on this song.

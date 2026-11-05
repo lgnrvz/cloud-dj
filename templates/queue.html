@@ -704,6 +704,7 @@
     let prevPlayingId = null;
     let currentTrackTitle = '';
     let currentTrackUser = '';
+    let lastSuggestedVid = null;   // whose genre the suggested trio is based on
 
     // Check if scoring is enabled
     fetch('/scoring-enabled').then(r=>r.json()).then(d => { scoringOn = d.scoring; }).catch(()=>{});
@@ -884,6 +885,13 @@
         try {
             const resp = await fetch('/now-playing');
             const np = await resp.json();
+            // A new song means a new genre: rebuild the suggested trio now
+            // instead of leaving the old song's picks up for up to a minute.
+            if (np.video_id && np.video_id !== lastSuggestedVid) {
+                lastSuggestedVid = np.video_id;
+                try { suggestedTimer = 60; } catch (e) {}
+                if (document.getElementById('suggestedList')) refreshSuggested();
+            }
             if (typeof np.crossfade === 'number' && np.crossfade !== fxSeconds) {
                 fxSeconds = np.crossfade;
                 // The setting can arrive after a song already started: preload
