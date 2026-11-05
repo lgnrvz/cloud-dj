@@ -1,9 +1,9 @@
 {
   "app.py": {
-    "mtime": 1793766236.1228735,
-    "seen": 1793766500.4045844,
-    "ast_hash": "c29da8acbf7e3bcebb78aaef1a68b6d3",
-    "semantic_hash": "c29da8acbf7e3bcebb78aaef1a68b6d3"
+    "mtime": 1793840629.0438797,
+    "seen": 1793843244.8386245,
+    "ast_hash": "101e9776f08bde3223e24752bf32d800",
+    "semantic_hash": ""
   },
   "backup.sh": {
     "mtime": 1793684922.2407923,
@@ -28,5 +28,95 @@
     "seen": 1793766500.4046345,
     "ast_hash": "794e32ca27b666d458084039efe1b0a3",
     "semantic_hash": "794e32ca27b666d458084039efe1b0a3"
+  },
+  ".github/workflows/build-windows.yml": {
+    "mtime": 1793684922.2407923,
+    "seen": 1793843244.8386624,
+    "ast_hash": "40d6053c95ffb4d29c6cde2539aff135",
+    "semantic_hash": ""
+  },
+  "README.md": {
+    "mtime": 1793684922.2407923,
+    "seen": 1793843244.838668,
+    "ast_hash": "71ec8482c6663b6a79c95e75f1698060",
+    "semantic_hash": ""
+  },
+  "backups/cloud-dj-20260727.txt": {
+    "mtime": 1793684922.2407923,
+    "seen": 1793843244.8386736,
+    "ast_hash": "b2e84bd695c97ebdfb1938108c339689",
+    "semantic_hash": ""
+  },
+  "backups/cloud-dj-20260728.txt": {
+    "mtime": 1793684922.2407923,
+    "seen": 1793843244.8386788,
+    "ast_hash": "573e5152080f0d3f9dcf8082b9789d67",
+    "semantic_hash": ""
+  },
+  "backups/cloud-dj-20260729.txt": {
+    "mtime": 1793684922.2407923,
+    "seen": 1793843244.8386836,
+    "ast_hash": "2a73ce09ea4c4d479f8c6498fc19fff7",
+    "semantic_hash": ""
+  },
+  "backups/cloud-dj-export.txt": {
+    "mtime": 1793684922.2407923,
+    "seen": 1793843244.8386884,
+    "ast_hash": "39e9cfa39c71f78b9df2a86d3e435a69",
+    "semantic_hash": ""
+  },
+  "karaoke-list.txt": {
+    "mtime": 1793684922.2407923,
+    "seen": 1793843244.8386943,
+    "ast_hash": "d91db813ccf989c4cb4e269e8377bcc3",
+    "semantic_hash": ""
+  },
+  "packaging/version_info.txt": {
+    "mtime": 1793684922.2407923,
+    "seen": 1793843244.8386998,
+    "ast_hash": "808c16e486f4a9842a22a8d46ea86782",
+    "semantic_hash": ""
+  },
+  "requirements.txt": {
+    "mtime": 1793684922.2407923,
+    "seen": 1793843244.8387046,
+    "ast_hash": "2a413571562d4669ae4136deec9f5a6c",
+    "semantic_hash": ""
+  },
+  "static/list_items.txt": {
+    "mtime": 1793684922.2487922,
+    "seen": 1793843244.83871,
+    "ast_hash": "5d0b36ad8fbe7290f0cd825dbc6917e4",
+    "semantic_hash": ""
+  },
+  "templates/admin.html": {
+    "mtime": 1793838863.943382,
+    "seen": 1793843244.838715,
+    "ast_hash": "fcb9b319c5ce697584377c9978aac9b1",
+    "semantic_hash": ""
+  },
+  "templates/base.html": {
+    "mtime": 1793684922.2487922,
+    "seen": 1793843244.8387206,
+    "ast_hash": "68e8ba75e7924d174a1774bc170a1302",
+    "semantic_hash": ""
+  },
+  "templates/login.html": {
+    "mtime": 1793684922.2487922,
+    "seen": 1793843244.838725,
+    "ast_hash": "03386e09c3961008104506b37adc3a81",
+    "semantic_hash": ""
+  },
+  "templates/queue.html": {
+    "mtime": 1793841998.2207565,
+    "seen": 1793843244.8387296,
+    "ast_hash": "5d5a150193a346644f11b7310245ba12",
+    "semantic_hash": ""
+  },
+  "templates/signup.html": {
+    "mtime": 1793684922.2487922,
+    "seen": 1793843244.8387349,
+    "ast_hash": "e9bc835c1e23414ba308065e21e34488",
+    "semantic_hash": ""
   }
 }
