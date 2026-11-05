@@ -170,6 +170,15 @@ else:
 app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=365)
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=365)
 
+
+@app.after_request
+def _no_stale_pages(resp):
+    """Templates + inline JS change on every deploy: never serve a cached page."""
+    if resp.mimetype == 'text/html':
+        resp.headers['Cache-Control'] = 'no-store, must-revalidate'
+        resp.headers['Pragma'] = 'no-cache'
+    return resp
+
 # Threading async mode (werkzeug + simple-websocket): not deprecated, works on
 # Linux/Mac/Windows with a single code path. eventlet is in bugfix-only mode
 # and hangs the dev server on Windows, so we dropped it entirely.
@@ -194,6 +203,77 @@ QUEUE_LIMIT_RESET_MINUTES = 5  # How long before a blocked user's counter resets
 
 # Auto-DJ: track which history songs have been played this round (no repeats until all done)
 _auto_dj_round_played = set()  # set of queue IDs played in the current round
+
+# ─── AUTO-DJ NEXT (reserved so the player can preload + crossfade it) ───
+AUTODJ_NEXT = None          # dict for the picked-but-not-yet-played song
+AUTODJ_BLOCK_SIZE = 14      # songs of one genre before Auto-DJ switches genre
+
+
+def _vid_of(url):
+    m = re.search(r'(?:v=|/)([\w-]{11})(?:\?|&|$)', url or '')
+    return m.group(1) if m else None
+
+
+def _autodj_pick():
+    """Pick (and remember) the next Auto-DJ song.
+
+    Auto-DJ stays on one genre for AUTODJ_BLOCK_SIZE songs, then switches to a
+    different genre. The pick is memoised in AUTODJ_NEXT so /next-track and
+    /advance agree: the song the browser preloaded is the song that plays.
+    """
+    global AUTODJ_NEXT
+    if AUTODJ_NEXT:
+        return AUTODJ_NEXT
+
+    conn = get_db()
+    played = conn.execute(
+        "SELECT id, title, clean_url, youtube_url FROM queue WHERE status='played'"
+    ).fetchall()
+    meta = {r['video_id']: r['genre'] for r in conn.execute(
+        "SELECT video_id, genre FROM song_meta WHERE genre IS NOT NULL")}
+    conn.close()
+    if not played:
+        return None
+
+    pools = {}
+    for r in played:
+        g = meta.get(_vid_of(r['clean_url'] or r['youtube_url']))
+        if g:
+            pools.setdefault(g, []).append(r)
+
+    genre = get_setting('autodj_genre')
+    count = int(get_setting('autodj_count', '0') or 0)
+    if not genre or count >= AUTODJ_BLOCK_SIZE or genre not in pools:
+        # Start a new genre block. Prefer genres with enough songs to fill it.
+        choices = [g for g in pools if g != genre and len(pools[g]) >= AUTODJ_BLOCK_SIZE]
+        if not choices:
+            choices = [g for g in pools if g != genre] or list(pools)
+        if choices:
+            genre = random.choice(choices)
+            set_setting('autodj_genre', genre)
+            set_setting('autodj_count', '0')
+            count = 0
+            print(f'[autodj] new genre block -> {genre}', flush=True)
+        else:
+            genre = None
+
+    pool = pools.get(genre) or played
+    if len(_auto_dj_round_played) >= len(played):
+        _auto_dj_round_played.clear()
+    fresh = [r for r in pool if r['id'] not in _auto_dj_round_played]
+    row = random.choice(fresh or pool)
+    _auto_dj_round_played.add(row['id'])
+
+    AUTODJ_NEXT = {
+        'id': -1,
+        'url': row['clean_url'] or row['youtube_url'],
+        'title': 'Auto-DJ: ' + (row['title'] or 'Unknown'),
+        'username': 'Cloud-DJ',
+        'is_auto_dj': True,
+        'has_history': True,
+        'genre': genre,
+    }
+    return AUTODJ_NEXT
 
 # Signup rate limit: track IP -> last signup timestamp (seconds)
 _signup_cooldown = {}  # IP -> timestamp
@@ -612,58 +692,24 @@ def get_next_pending():
 
 def set_now_playing(item):
     """Update NOW_PLAYING from a queue item (dict/Row) or None (-> Auto-DJ from history)."""
-    global NOW_PLAYING, _auto_dj_round_played
+    global NOW_PLAYING, AUTODJ_NEXT
     if item is None:
-        # Auto-DJ: shuffle a random previously played song, no repeats until all are played
-        conn = get_db()
-        # Check if there's ANY history at all
-        total_played = conn.execute(
-            "SELECT COUNT(*) as c FROM queue WHERE status='played'"
-        ).fetchone()['c']
-
-        if total_played == 0:
-            conn.close()
+        pick = _autodj_pick()
+        if not pick:
             NOW_PLAYING = {
                 'id': None, 'url': None, 'title': 'Nothing playing',
                 'username': '-', 'is_auto_dj': False, 'has_history': False
             }
         else:
-            # If we've played everything in the current round, reset
-            if len(_auto_dj_round_played) >= total_played:
-                _auto_dj_round_played.clear()
-
-            # Pick a random song NOT yet played this round
-            played = None
-            if _auto_dj_round_played:
-                placeholders = ','.join('?' * len(_auto_dj_round_played))
-                played = conn.execute(
-                    f"SELECT * FROM queue WHERE status='played' AND id NOT IN ({placeholders}) ORDER BY RANDOM() LIMIT 1",
-                    list(_auto_dj_round_played)
-                ).fetchone()
-            # Fallback: if somehow all are in the set (shouldn't happen after reset), grab any
-            if not played:
-                played = conn.execute(
-                    "SELECT * FROM queue WHERE status='played' ORDER BY RANDOM() LIMIT 1"
-                ).fetchone()
-            conn.close()
-
-            if played:
-                # Track this song for the current round
-                _auto_dj_round_played.add(played['id'])
-
-                NOW_PLAYING = {
-                    'id': -1,
-                    'url': played['clean_url'] or played['youtube_url'],
-                    'title': 'Auto-DJ: ' + (played['title'] or 'Unknown'),
-                    'username': 'Cloud-DJ',
-                    'is_auto_dj': True,
-                    'has_history': True
-                }
-            else:
-                NOW_PLAYING = {
-                    'id': None, 'url': None, 'title': 'Nothing playing',
-                    'username': '-', 'is_auto_dj': False, 'has_history': False
-                }
+            # Consume the reservation so the next preload picks a fresh song
+            NOW_PLAYING = {k: v for k, v in pick.items() if k != 'genre'}
+            AUTODJ_NEXT = None
+            # Advance the genre block counter only when a song actually plays
+            try:
+                n = int(get_setting('autodj_count', '0') or 0) + 1
+                set_setting('autodj_count', str(n))
+            except (TypeError, ValueError):
+                set_setting('autodj_count', '1')
     else:
         NOW_PLAYING = {
             'id': item['id'],
@@ -891,6 +937,11 @@ def _enrich_now(np):
         c = conn.execute("SELECT COUNT(*) as cnt FROM queue WHERE status='pending'").fetchone()
         np['queue_count'] = c['cnt'] if c else 0
         conn.close()
+    # Player needs this to know when to overlap the next song
+    try:
+        np['crossfade'] = float(get_setting('crossfade_seconds', '4') or 0)
+    except (TypeError, ValueError):
+        np['crossfade'] = 4.0
     return np
 
 @app.route('/now-playing')
@@ -1432,6 +1483,10 @@ def direct_video():
 
     path = _prepare_video(video_id)
     if not path:
+        if request.args.get('preload') == '1':
+            # Preloading must never mark a song failed or advance the queue:
+            # the browser just abandons the preload and tries again on play.
+            return jsonify({'error': 'Failed to prepare video', 'preload': True}), 502
         # If the video that just failed is the one playing now, drop it and move
         # on so the player can't wedge on a permanently unavailable source.
         skipped = _fail_current_video(video_id)
@@ -1613,6 +1668,42 @@ def suggested():
 
 
 # ─── PLAYER ADVANCEMENT ───
+
+@app.route('/next-track')
+@login_required
+def next_track():
+    """What plays next, reserved so the player can preload and crossfade it.
+
+    A pending queue item always wins; otherwise the Auto-DJ pick is reserved
+    here and stays reserved (set aside) until a queue song claims the slot,
+    which is what makes a cancelled queue item hand control back to Auto-DJ.
+    ?discard=1 drops a reserved Auto-DJ pick that failed to prepare, so the
+    preloader can ask for a different one instead of retrying the same dud.
+    """
+    global AUTODJ_NEXT
+    crossfade = float(get_setting('crossfade_seconds', '4') or 0)
+    item = get_next_pending()
+    if request.args.get('discard') == '1' and not item:
+        AUTODJ_NEXT = None
+    if item:
+        track = {
+            'id': item['id'],
+            'url': item['clean_url'] or item['youtube_url'],
+            'title': item['title'],
+            'username': item['username'],
+            'is_auto_dj': False,
+            'source': 'queue',
+        }
+    else:
+        pick = _autodj_pick()
+        if not pick:
+            return jsonify({'track': None, 'crossfade': crossfade})
+        track = {k: v for k, v in pick.items() if k != 'genre'}
+        track['source'] = 'autodj'
+    track['video_id'] = _vid_of(track['url'])
+    return jsonify({'track': track, 'crossfade': crossfade,
+                    'autodj_genre': get_setting('autodj_genre')})
+
 
 @app.route('/advance', methods=['POST'])
 @login_required
@@ -1968,6 +2059,28 @@ def admin_settings_loudness():
         return jsonify({'success': True, 'target': LOUDNESS_TARGET})
     return jsonify({'target': LOUDNESS_TARGET,
                     'min': LOUDNESS_TARGET_MIN, 'max': LOUDNESS_TARGET_MAX})
+
+
+@app.route('/admin/settings/crossfade', methods=['GET', 'POST'])
+@login_required
+def admin_settings_crossfade():
+    """Get or set the crossfade length in seconds (0 = hard cut, 1-12 = blend)."""
+    if not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized'}), 403
+    if request.method == 'POST':
+        data = request.get_json(silent=True) or {}
+        try:
+            val = float(data.get('seconds', 4))
+        except (TypeError, ValueError):
+            return jsonify({'error': 'seconds must be a number'}), 400
+        if not (0 <= val <= 12):
+            return jsonify({'error': 'crossfade must be between 0 and 12 seconds'}), 400
+        val = round(val, 1)
+        set_setting('crossfade_seconds', str(val))
+        print(f'[crossfade] admin set to {val}s', flush=True)
+        return jsonify({'success': True, 'seconds': val})
+    return jsonify({'seconds': float(get_setting('crossfade_seconds', '4') or 0),
+                    'min': 0, 'max': 12})
 
 
 @app.route('/admin/change-password', methods=['POST'])

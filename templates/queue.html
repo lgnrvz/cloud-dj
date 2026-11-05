@@ -534,6 +534,9 @@
                 <video id="html5Player" playsinline controls
                        preload="auto"
                        style="width:100%;display:block;background:#000;"></video>
+                <video id="html5PlayerB" playsinline
+                       preload="auto"
+                       style="width:100%;display:none;background:#000;"></video>
             </div>
             {% endif %}
 
@@ -679,7 +682,12 @@
         }
     }
 
-    const video = document.getElementById('html5Player');
+    let video = document.getElementById('html5Player');
+    const videoB = document.getElementById('html5PlayerB');
+    let standbyEl = videoB;          // the element the next song is preloaded into
+    let preloadedTrack = null;       // {id, video_id, url, title, username}
+    let crossfadeInProgress = false;
+    let fxSeconds = 0;               // 0 = hard cut; set from the server setting
     const videoContainer = document.getElementById('videoContainer');
     const videoLoading = document.getElementById('videoLoading');
     const skipBtn = document.getElementById('skipBtn');
@@ -864,6 +872,11 @@
             }
         }
         loadingNext = false;
+
+        // Preload (and later crossfade) the next song while this one plays
+        video.style.display = 'block';
+        standbyEl.style.display = 'none';
+        preloadNext();
     }
 
     /** Poll now-playing */
@@ -871,6 +884,14 @@
         try {
             const resp = await fetch('/now-playing');
             const np = await resp.json();
+            if (typeof np.crossfade === 'number' && np.crossfade !== fxSeconds) {
+                fxSeconds = np.crossfade;
+                // The setting can arrive after a song already started: preload
+                // now so the first crossfade isn't silently skipped.
+                if (fxSeconds > 0 && !preloadedTrack && !crossfadeInProgress && video.src) {
+                    preloadNext();
+                }
+            }
             if (typeof updateNowUi === 'function') updateNowUi(np.title, np.username);
 
             const qc = document.getElementById('queueCount');
@@ -893,8 +914,12 @@
         }
     }
 
-    /** Advance when track ends */
-    video.addEventListener('ended', async function() {
+    /** Advance when track ends (registered on both media elements) */
+    async function handleEnded() {
+        // The inactive element finishing is never news
+        if (this !== video) return;
+        // A crossfade already swapped in the next song; don't advance twice
+        if (crossfadeInProgress) return;
         prevPlayingId = currentPlayingId;
         currentPlayingId = null;
         loadingNext = true;
@@ -918,7 +943,139 @@
             setStatus('#444', 'Error advancing');
         }
         loadingNext = false;
-    });
+    }
+    video.addEventListener('ended', handleEnded);
+    videoB.addEventListener('ended', handleEnded);
+
+    // ─── PRELOAD + CROSSFADE ───
+    // While a song plays, the next one is fetched and buffered into the idle
+    // element. The last N seconds of the current song overlap with the start of
+    // the next, ramping one volume down while the other comes up.
+
+    /** Ask the server what plays next and buffer it into the idle element */
+    async function preloadNext() {
+        preloadedTrack = null;
+        const el = standbyEl;
+        try { el.pause(); el.removeAttribute('src'); el.load(); } catch (e) {}
+        if (!fxSeconds || fxSeconds <= 0) return;
+        for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+                const resp = await fetch('/next-track' + (attempt ? '?discard=1' : ''));
+                if (!resp.ok) return;
+                const d = await resp.json();
+                if (!d.track || !d.track.video_id || !d.track.url) return;
+                // Prepare (download + normalise) in the background on the server too
+                const r2 = await fetch('/direct-video?preload=1&url=' + encodeURIComponent(d.track.url));
+                if (!r2.ok) {
+                    // A dud Auto-DJ pick would otherwise stay reserved forever:
+                    // ask for a different one (queue items are left alone).
+                    if (d.track.source === 'autodj') continue;
+                    return;
+                }
+                const v = await r2.json();
+                if (!v.video_url) return;
+                el.src = v.video_url;
+                el.load();
+                preloadedTrack = d.track;
+                return;
+            } catch (e) {
+                return;
+            }
+        }
+    }
+
+    /** Start the overlap when the current song is N seconds from the end */
+    function handleTimeupdate() {
+        if (this !== video) return;
+        if (!fxSeconds || fxSeconds <= 0 || crossfadeInProgress) return;
+        if (!preloadedTrack || !preloadedTrack.video_id) return;
+        const dur = video.duration;
+        if (!dur || !isFinite(dur)) return;
+        const remaining = dur - video.currentTime;
+        if (remaining <= fxSeconds + 0.2 && remaining > 0.3) {
+            if (standbyEl.readyState >= 2) startCrossfade();
+        }
+    }
+    video.addEventListener('timeupdate', handleTimeupdate);
+    videoB.addEventListener('timeupdate', handleTimeupdate);
+
+    function startCrossfade() {
+        if (crossfadeInProgress) return;
+        const out = video, inc = standbyEl;
+        if (!inc.src) return;
+        crossfadeInProgress = true;
+        setStatus('#1db954', 'Crossfading...');
+        try {
+            inc.currentTime = 0;
+        } catch (e) {}
+        inc.volume = 0;
+
+        // Only ramp once the incoming element is actually rolling: if the
+        // browser refuses to start it, fall back to a normal hard cut instead
+        // of leaving the room in silence.
+        const begin = function () {
+            const durMs = Math.max(400, fxSeconds * 1000);
+            const t0 = performance.now();
+            const timer = setInterval(function () {
+                const prog = Math.min(1, (performance.now() - t0) / durMs);
+                out.volume = Math.max(0, 1 - prog);
+                inc.volume = Math.min(1, prog);
+                if (prog >= 1) {
+                    clearInterval(timer);
+                    finishCrossfade(out, inc);
+                }
+            }, 50);
+        };
+        const pr = inc.play();
+        if (pr && pr.then) {
+            pr.then(begin).catch(function () {
+                crossfadeInProgress = false;
+                out.volume = 1;
+                try { inc.pause(); inc.currentTime = 0; inc.volume = 1; } catch (e) {}
+            });
+        } else {
+            begin();
+        }
+    }
+
+    async function finishCrossfade(out, inc) {
+        const target = preloadedTrack;
+        try {
+            out.pause();
+            out.removeAttribute('src');
+            out.load();
+        } catch (e) {}
+        out.volume = 1;
+        out.style.display = 'none';
+        inc.style.display = 'block';
+        inc.volume = 1;
+        video = inc;
+        standbyEl = out;
+        crossfadeInProgress = false;
+        preloadedTrack = null;
+        setStatus('#1db954', 'Playing');
+
+        prevPlayingId = currentPlayingId;
+        loadingNext = true;
+        try {
+            const resp = await fetch('/advance', { method: 'POST' });
+            const np = await resp.json();
+            updateNowUi(np.title, np.username);
+            currentTrackTitle = np.title || '';
+            currentTrackUser = np.username || '-';
+            currentPlayingId = np.id;
+            loadingNext = false;
+            if (np.video_id && target && np.video_id !== target.video_id) {
+                // A queue item took the slot mid-song: honour it
+                await loadTrack(np);
+                return;
+            }
+            refreshQueueList();
+            preloadNext();
+        } catch (e) {
+            loadingNext = false;
+        }
+    }
 
     /** Confetti + score popup (videoke style) */
     const SCORE_COMMENTS = [
