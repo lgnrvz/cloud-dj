@@ -421,14 +421,114 @@ init_db()
 
 
 def get_setting(key, default=None):
-    """Read a persisted app setting (survives restarts)."""
+    """Read a persisted app setting (falls back to *default*)."""
     try:
         conn = get_db()
         row = conn.execute("SELECT value FROM app_settings WHERE key=?", (key,)).fetchone()
         conn.close()
-        return row['value'] if row else default
-    except sqlite3.Error:
+        return row['value'] if row and row['value'] is not None else default
+    except Exception:
         return default
+
+
+# ─── GENRE LOOKUP (Deezer, cached in song_meta) ───
+_GENRE_LOOKUPS = set()
+
+
+def _deezer_json(path, timeout=8):
+    try:
+        req = urllib.request.Request('https://api.deezer.com/' + path,
+                                     headers={'User-Agent': 'cloud-dj/1.0'})
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.loads(r.read())
+    except Exception:
+        return {}
+
+
+def _parse_artist_title(title):
+    """Pull 'Artist - Song' out of a YouTube title."""
+    t = (title or '').strip()
+    t = re.sub(r'^auto-dj:\s*', '', t, flags=re.I)
+    for _ in range(4):
+        new = re.sub(r'\s*[\(\[\{][^\)\]\}]*[\)\]\}]\s*$', '', t).strip()
+        if new == t:
+            break
+        t = new
+    t = re.sub(r'\s+(ft\.?|feat\.?)\s+.*$', '', t, flags=re.I).strip()
+    if ' - ' in t:
+        a, _, s = t.partition(' - ')
+        return a.strip(), s.strip()
+    m = re.match(r'(.+?)\s+by\s+(.+)$', t, re.I)
+    if m:
+        return m.group(2).strip(), m.group(1).strip()
+    return None, t
+
+
+def _album_genre(album_id):
+    alb = _deezer_json(f'album/{album_id}')
+    genres = [g.get('name') for g in (alb.get('genres') or {}).get('data', [])]
+    return genres[0] if genres else None
+
+
+def _lookup_genre(title):
+    """Best-effort genre: track match, then any album by the parsed artist."""
+    artist, song = _parse_artist_title(title)
+    queries = []
+    if artist:
+        queries.append(f'artist:"{artist}" track:"{song}"')
+        queries.append(f'{artist} {song}')
+    if song:
+        queries.append(song)
+    for q in queries:
+        data = _deezer_json('search/track?q=' + urllib.parse.quote(q) + '&limit=5')
+        for t in (data.get('data') or [])[:3]:
+            alb = (t.get('album') or {}).get('id')
+            if alb:
+                g = _album_genre(alb)
+                if g:
+                    return g, artist
+    if artist:
+        found = (_deezer_json('search/artist?q=' + urllib.parse.quote(artist) + '&limit=1')
+                 .get('data') or [])
+        if found:
+            albums = (_deezer_json(f"artist/{found[0]['id']}/albums?limit=1").get('data') or [])
+            if albums:
+                g = _album_genre(albums[0]['id'])
+                if g:
+                    return g, artist
+    return None, artist
+
+
+def _ensure_genre(video_id, title):
+    """Fill song_meta for a track in the background (once per video)."""
+    if not video_id or video_id in _GENRE_LOOKUPS:
+        return
+    _GENRE_LOOKUPS.add(video_id)
+
+    def work():
+        try:
+            conn = get_db()
+            row = conn.execute("SELECT genre, source FROM song_meta WHERE video_id=?",
+                               (video_id,)).fetchone()
+            conn.close()
+            if row and (row['genre'] or row['source'] == 'none'):
+                return
+            genre, artist = _lookup_genre(title or '')
+            conn = get_db()
+            conn.execute(
+                "INSERT OR REPLACE INTO song_meta(video_id,artist,song,genre,source,fetched_at) "
+                "VALUES(?,?,?,?,?,?)",
+                (video_id, artist, title, genre, 'deezer' if genre else 'none',
+                 datetime.now().isoformat(timespec='seconds')))
+            conn.commit()
+            conn.close()
+            print(f'[genre] {video_id} -> {genre or "unknown"}', flush=True)
+        except Exception as e:
+            print(f'[genre] lookup failed for {video_id}: {e}', flush=True)
+        finally:
+            _GENRE_LOOKUPS.discard(video_id)
+
+    threading.Thread(target=work, daemon=True).start()
 
 
 def set_setting(key, value):
@@ -783,6 +883,8 @@ def _enrich_now(np):
         m = re.search(r'(?:v=|/)([\w-]{11})(?:\?|&|$)', np['url'])
         if m:
             np['video_id'] = m.group(1)
+            # Tag the genre in the background so suggestions can group by it
+            _ensure_genre(np['video_id'], np.get('title'))
     # Add queue count if not present
     if 'queue_count' not in np:
         conn = get_db()
@@ -1466,6 +1568,10 @@ def suggested():
 
     cur_vid = vid_of(NOW_PLAYING.get('url') or '')
     cur_genre = genres.get(cur_vid) if cur_vid else None
+    if cur_vid and not cur_genre:
+        # Unknown genre — look it up in the background; the next refresh picks
+        # it up instead of the top 3 silently disappearing on this song.
+        _ensure_genre(cur_vid, NOW_PLAYING.get('title'))
 
     def payload(r, rank):
         return {'id': r['id'], 'title': r['title'], 'username': r['username'],
