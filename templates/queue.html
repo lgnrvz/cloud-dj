@@ -1496,16 +1496,17 @@
     let suggestedTimer = 60;
     let timerLabel = null;
 
-    /** Manual refresh from the hover refresh button — resets countdown */
+    /** Manual refresh from the hover refresh button — resets countdown and
+     *  rotates the genre top 3 so the pinned picks change too */
     function manualRefreshSuggested() {
         suggestedTimer = 60;
         if (timerLabel) timerLabel.textContent = '60s';
-        refreshSuggested();
+        refreshSuggested(true);
     }
     /** Refresh suggested songs from history */
-    async function refreshSuggested() {
+    async function refreshSuggested(rotate) {
         try {
-            const resp = await fetch('/suggested');
+            const resp = await fetch('/suggested' + (rotate ? '?rotate=1' : ''));
             if (!resp.ok) return;
             const d = await resp.json();
             const countLabel = document.getElementById('suggestedCountText');

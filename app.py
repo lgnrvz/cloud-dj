@@ -1473,14 +1473,26 @@ def suggested():
 
     items, used = [], set(exclude_ids)
     plain = request.args.get('plain') == '1'
+    rotate = request.args.get('rotate') == '1'
+
+    def genre_pool():
+        return [r for r in played
+                if genres.get(vid_of(r['clean_url'])) == cur_genre and r['id'] not in used]
+
     if cur_genre and not plain:
         want = min(3, limit)
-        for r in played:
-            if len(items) >= want:
-                break
-            if r['id'] in used:
-                continue
-            if genres.get(vid_of(r['clean_url'])) == cur_genre:
+        if rotate:
+            # Manual refresh: shuffle the popular end of the genre so the top 3
+            # actually change instead of showing the same three every time.
+            head = genre_pool()[:40]
+            random.shuffle(head)
+            for r in head[:want]:
+                items.append(payload(r, len(items) + 1))
+                used.add(r['id'])
+        else:
+            for r in genre_pool():
+                if len(items) >= want:
+                    break
                 items.append(payload(r, len(items) + 1))
                 used.add(r['id'])
 
