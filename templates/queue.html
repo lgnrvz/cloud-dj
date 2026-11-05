@@ -1663,7 +1663,20 @@
     /** Refresh suggested songs from history */
     async function refreshSuggested(rotate) {
         try {
-            const resp = await fetch('/suggested' + (rotate ? '?rotate=1' : ''));
+            // Always rotate, and exclude what is on screen: with Auto-DJ holding
+            // one genre for 14 songs, a stable top 3 looked completely frozen.
+            const list0 = document.getElementById('suggestedList');
+            const shown = [];
+            if (list0) {
+                list0.querySelectorAll('.add-btn').forEach(b => {
+                    const m = (b.getAttribute('onclick') || '').match(/addSuggested\((\d+)/);
+                    if (m) shown.push(m[1]);
+                });
+            }
+            const params = new URLSearchParams();
+            params.set('rotate', '1');
+            if (shown.length) params.set('exclude', shown.join(','));
+            const resp = await fetch('/suggested?' + params.toString());
             if (!resp.ok) return;
             const d = await resp.json();
             const countLabel = document.getElementById('suggestedCountText');
