@@ -1630,6 +1630,10 @@ def suggested():
         # Unknown genre — look it up in the background; the next refresh picks
         # it up instead of the top 3 silently disappearing on this song.
         _ensure_genre(cur_vid, NOW_PLAYING.get('title'))
+        # During an Auto-DJ block the genre is known from the block itself, so
+        # untagged tracks (live takes, karaoke uploads) still get ranked picks.
+        if NOW_PLAYING.get('is_auto_dj'):
+            cur_genre = get_setting('autodj_genre') or None
 
     def payload(r, rank):
         return {'id': r['id'], 'title': r['title'], 'username': r['username'],
